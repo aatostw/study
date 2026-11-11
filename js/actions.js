@@ -133,7 +133,9 @@ async function act(name, fn){
 
 /* ---------- 所有按鈕 ---------- */
 const ACT = {
-  "tab": el => { closeSheet(); go(el.dataset.v); },
+  "tab": el => { closeSheet(); if (el.dataset.v === "prefs") S.prefPage = null; go(el.dataset.v); },
+  "pref-open": el => { S.prefPage = el.dataset.p; S.err.ai = ""; render.last = null; render(); $("#main").scrollTop = 0; if (el.dataset.p === "status") loadStatus().catch(() => {}); },
+  "pref-back": () => { S.prefPage = null; render.last = null; render(); $("#main").scrollTop = 0; },
   "back": () => { closeSheet(); go(S.view); },
   "reload": () => { S.err.load = ""; render(); load(); },
   "close-sheet": () => closeSheet(),
@@ -257,11 +259,6 @@ const ACT = {
 
   /* 設定 */
   "status-refresh": () => { S.status = null; render(); loadStatus().catch(e => toast(errMsg(e))); },
-  "keys-save": () => {
-    const keys = {};
-    ["gemini", "anthropic", "openai", "custom"].forEach(p => { const v = ($("#k-" + p) || {}).value; if (v && v.trim()) keys[p] = v.trim(); });
-    act("keys", async () => { const r = await api("/settings", {method: "PUT", json: {ai: {keys, custom_base: $("#k-custom-base").value}}}); S.settings.ai = r.ai; toast("金鑰存好了"); });
-  },
   "key-del": el => act("keys", async () => { const r = await api("/settings", {method: "PUT", json: {ai: {keys: {[el.dataset.p]: "-"}}}}); S.settings.ai = r.ai; }),
   "m-list": el => {
     const t = el.dataset.task, m = (S.modelDraft || {})[t] || S.settings.ai.models[t];
@@ -275,10 +272,22 @@ const ACT = {
       catch (e) { S.test[t] = "✗ " + errMsg(e); }
     });
   },
-  "models-save": () => {
+  "ai-save": () => {
+    const keys = {};
+    ["gemini", "anthropic", "openai", "custom"].forEach(p => { const v = ($("#k-" + p) || {}).value; if (v && v.trim()) keys[p] = v.trim(); });
     const models = Object.assign({}, S.settings.ai.models, S.modelDraft || {});
-    act("models", async () => { const r = await api("/settings", {method: "PUT", json: {ai: {models}}}); S.settings.ai = r.ai; S.modelDraft = null; toast("模型設定存好了"); });
+    act("ai", async () => {
+      const r = await api("/settings", {method: "PUT", json: {ai: {keys, custom_base: $("#k-custom-base").value, models}}});
+      S.settings.ai = r.ai; S.modelDraft = null; toast("AI 設定存好了");
+    });
   },
+  "voice-test": () => act("voiceTest", () => new Promise((resolve, reject) => {
+    const pr = S.settings.prefs || {};
+    const a = new Audio(apiUrl("/tts/audio", {text: "你好，這是學習筆記的朗讀測試。Small steps every day.", lang: pr.tts_lang || "zh", speed: pr.tts_speed || 1}));
+    a.oncanplaythrough = () => { a.play().catch(() => {}); resolve(); };
+    a.onerror = () => reject(new Error("唸不出來：確認電腦上的「啟動語音伺服器」開著。"));
+    $("#au").pause(); TTSP.stop();
+  })),
   "pref": el => act("pref", async () => { const r = await api("/settings", {method: "PUT", json: {prefs: {[el.dataset.k]: el.dataset.v}}}); S.settings.prefs = r.prefs; }),
   "api-save": () => { S.api = $("#api-url").value.trim().replace(/\/+$/, "") || DEFAULT_API; lsSet("api", S.api); toast("網址存好了"); load(); },
   "logout": async () => { if (await confirmBox("登出？", "這支手機要重新輸入密碼才能用。", "登出")) logout(); }
@@ -298,11 +307,16 @@ document.addEventListener("input", e => {
   else if (d === "lecq") S.ask.lecDraft = el.value;
   else if (d === "tts") S.tts.text = el.value;
   else if (d === "tr"){ S.trFilter = el.value; clearTimeout(ACT._tr); ACT._tr = setTimeout(() => render(), 250); }
+  if (el.id === "pref-speed"){ $("#pref-speed-v").textContent = Number(el.value).toFixed(1) + "×"; }
   if (el.id === "tts-speed"){ $("#tts-speed-v").textContent = Number(el.value).toFixed(1) + "×"; }
   if (el.id === "pl-seek"){ $("#au").currentTime = Number(el.value); }
 });
 document.addEventListener("change", async e => {
   const el = e.target, a = el.dataset && el.dataset.actChange;
+  if (a === "pref-speed"){
+    const v = Number(el.value);
+    try { const r = await api("/settings", {method: "PUT", json: {prefs: {tts_speed: v}}}); S.settings.prefs = r.prefs; S.tts.speed = null; } catch (err) { toast(errMsg(err)); }
+  }
   if (a === "tts-speed"){ S.tts.speed = Number(el.value); TTSP.stop(); S.tts.ready = {}; render(); }
   if (a === "m-provider" || a === "m-model"){
     const t = el.dataset.task;

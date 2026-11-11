@@ -11,7 +11,7 @@ async function load(){
     if (S.view === "ask"){ if (!S.books) loadBooks(true); return await loadAsks(); }
     if (S.view === "books") return await loadBooks();
     if (S.view === "lectures"){ loadInbox(); return await loadLectures(); }
-    if (S.view === "tts" || S.view === "prefs"){ await loadSettings(); if (S.view === "prefs") await loadStatus(); }
+    if (S.view === "tts" || S.view === "prefs"){ if (S.view === "prefs") loadStatus().catch(() => {}); return await loadSettings(); }
   } catch (e) { if (!e.relogin){ S.err.load = errMsg(e); render(); } }
 }
 async function loadAsks(){ S.asks = (await api("/asks?limit=15")).asks; S.err.load = ""; render(); }

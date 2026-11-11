@@ -184,6 +184,25 @@ textarea.input{resize:vertical;line-height:1.6}
 .dialog .card{max-width:380px;width:100%}
 .toast{position:absolute;left:50%;bottom:86px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;z-index:80;max-width:88%;text-align:center;box-shadow:var(--shadow)}
 
+/* ---------- settings（跟每日英文一樣） ---------- */
+.card h2.title{font-size:20px;color:var(--primary-text)}
+.menu-row{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;text-align:left;border:0;background:#F2F4FB;border-radius:14px;padding:14px 16px;font:inherit;color:inherit}
+.menu-row > span:first-child{display:flex;flex-direction:column;gap:2px;min-width:0}
+.menu-row .small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.menu-row .chev{font-size:22px;color:var(--muted);flex:none}
+.back-row{display:flex;align-items:center;gap:12px}
+.back-btn{width:40px;height:40px;flex:none;border-radius:12px;border:1px solid #DDE3EA;background:#fff;color:#6B7A8A;display:grid;place-items:center;cursor:pointer;padding:0;transition:transform .1s}
+.back-btn:active{transform:scale(.95)}
+.pref-card{gap:18px}
+.pref-group{display:flex;flex-direction:column;gap:8px}
+.pref-h{font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.04em}
+.pref-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:var(--field);border-radius:14px}
+.task-box{display:flex;flex-direction:column;gap:8px;padding:14px;border-radius:14px;background:var(--field)}
+.task-box .input,.task-box .btn.soft{background:var(--surface)}
+.val-pill{font-family:var(--font-en);font-weight:700;font-size:14px;background:var(--primary-soft);color:var(--primary);border-radius:999px;padding:2px 10px}
+.prefs-logout{display:block;margin:6px auto 0;border:0;background:none;font:inherit;font-size:16px;font-weight:700;color:#D93025;padding:12px 28px;cursor:pointer;border-radius:12px}
+.prefs-logout:active{background:#FBE9E7}
+
 /* ---------- login gate ---------- */
 .gate{position:absolute;inset:0;z-index:50;background:#F5F7FA;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain}
 .gate .g-deco{position:absolute;pointer-events:none}
