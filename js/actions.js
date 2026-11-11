@@ -134,7 +134,16 @@ async function act(name, fn){
 /* ---------- 所有按鈕 ---------- */
 const ACT = {
   "tab": el => { closeSheet(); if (el.dataset.v === "prefs") S.prefPage = null; go(el.dataset.v); },
-  "pref-open": el => { S.prefPage = el.dataset.p; S.err.ai = ""; render.last = null; render(); $("#main").scrollTop = 0; if (el.dataset.p === "status") loadStatus().catch(() => {}); },
+  "pref-open": el => {
+    S.prefPage = el.dataset.p; S.aiTest = null; S.dd = null; render.last = null; render(); $("#main").scrollTop = 0;
+    if (el.dataset.p === "status") loadStatus().catch(() => {});
+    if (el.dataset.p === "ai" && S.settings){
+      const a = S.settings.ai;
+      Object.keys(a.keys).filter(p => a.keys[p] && !S.models[p]).forEach(p => aiLoadModels(p, true));
+      const d = aiDefault();
+      if (d.provider === "custom" && !S.models.custom) aiLoadModels("custom", true);
+    }
+  },
   "pref-back": () => { S.prefPage = null; render.last = null; render(); $("#main").scrollTop = 0; },
   "back": () => { closeSheet(); go(S.view); },
   "reload": () => { S.err.load = ""; render(); load(); },
@@ -259,26 +268,33 @@ const ACT = {
 
   /* 設定 */
   "status-refresh": () => { S.status = null; render(); loadStatus().catch(e => toast(errMsg(e))); },
-  "key-del": el => act("keys", async () => { const r = await api("/settings", {method: "PUT", json: {ai: {keys: {[el.dataset.p]: "-"}}}}); S.settings.ai = r.ai; }),
-  "m-list": el => {
-    const t = el.dataset.task, m = (S.modelDraft || {})[t] || S.settings.ai.models[t];
-    act("ml" + m.provider, async () => { S.models[m.provider] = (await api("/ai/models?provider=" + m.provider)).models; toast("找到 " + S.models[m.provider].length + " 個模型，點模型名稱的欄位挑選"); });
+  "dd-toggle": el => { S.dd = S.dd === el.dataset.dd ? null : el.dataset.dd; render(); },
+  "dd-pick": el => {
+    const id = el.dataset.dd, v = el.dataset.val;
+    S.dd = null;
+    if (id === "ai-prov"){
+      S.aiProv = v;
+      const a = S.settings.ai;
+      aiSetDefault(v, "");
+      if (a.keys[v] || v === "custom") aiLoadModels(v);
+      return;
+    }
+    if (id === "ai-model") return aiSetDefault(aiDefault().provider, v);
+    if (id.startsWith("tk-")){
+      const t = id.slice(3), d = aiDefault();
+      const [prov, ...rest] = v ? v.split("|") : [d.provider, d.model];
+      return aiSave({models: {[t]: {provider: prov, model: v ? rest.join("|") : d.model}}});
+    }
+    render();
   },
-  "m-test": el => {
-    const t = el.dataset.task, m = (S.modelDraft || {})[t] || S.settings.ai.models[t];
-    S.test = S.test || {};
-    act("mt" + t, async () => {
-      try { const r = await api("/ai/test", {json: m}); S.test[t] = "✓ 可以用（" + (r.ms / 1000).toFixed(1) + " 秒）"; }
-      catch (e) { S.test[t] = "✗ " + errMsg(e); }
-    });
-  },
-  "ai-save": () => {
-    const keys = {};
-    ["gemini", "anthropic", "openai", "custom"].forEach(p => { const v = ($("#k-" + p) || {}).value; if (v && v.trim()) keys[p] = v.trim(); });
-    const models = Object.assign({}, S.settings.ai.models, S.modelDraft || {});
-    act("ai", async () => {
-      const r = await api("/settings", {method: "PUT", json: {ai: {keys, custom_base: $("#k-custom-base").value, models}}});
-      S.settings.ai = r.ai; S.modelDraft = null; toast("AI 設定存好了");
+  "key-eye": el => { const i = $("#" + el.dataset.for); if (i) i.type = i.type === "password" ? "text" : "password"; },
+  "m-reload": () => aiLoadModels(aiDefault().provider),
+  "ai-test": () => {
+    const d = aiDefault();
+    S.aiTest = null;
+    act("aiTest", async () => {
+      try { const r = await api("/ai/test", {json: d}); S.aiTest = {ok: true, msg: "連線成功：" + r.model + " 回答了（" + (r.ms / 1000).toFixed(1) + " 秒）。"}; }
+      catch (e) { S.aiTest = {ok: false, msg: errMsg(e)}; }
     });
   },
   "voice-test": () => act("voiceTest", () => new Promise((resolve, reject) => {
@@ -295,6 +311,7 @@ const ACT = {
 
 /* ---------- 事件 ---------- */
 document.addEventListener("click", e => {
+  if (S.dd && !e.target.closest(".dd")){ S.dd = null; render(); if (!e.target.closest("[data-act]")) return; }
   const el = e.target.closest("[data-act]");
   if (!el || el.disabled) return;
   const fn = ACT[el.dataset.act];
@@ -318,15 +335,14 @@ document.addEventListener("change", async e => {
     try { const r = await api("/settings", {method: "PUT", json: {prefs: {tts_speed: v}}}); S.settings.prefs = r.prefs; S.tts.speed = null; } catch (err) { toast(errMsg(err)); }
   }
   if (a === "tts-speed"){ S.tts.speed = Number(el.value); TTSP.stop(); S.tts.ready = {}; render(); }
-  if (a === "m-provider" || a === "m-model"){
-    const t = el.dataset.task;
-    S.modelDraft = S.modelDraft || {};
-    const cur = S.modelDraft[t] || Object.assign({}, S.settings.ai.models[t]);
-    if (a === "m-provider"){ cur.provider = el.value; cur.model = ""; }
-    else cur.model = el.value.trim();
-    S.modelDraft[t] = cur;
-    if (a === "m-provider") render();
+  if (a === "ai-key" && el.value.trim()){
+    const p = el.dataset.p;
+    await aiSave({keys: {[p]: el.value.trim()}});
+    toast("金鑰存好了");
+    aiLoadModels(p);
   }
+  if (a === "ai-base") await aiSave({custom_base: el.value.trim()});
+  if (a === "ai-model-text" && el.value.trim()) await aiSetDefault(aiDefault().provider || S.aiProv, el.value.trim());
   if (el.id === "pick-lecture" && el.files[0]) lectureForm(el.files[0]);
   if (el.id === "pick-book" && el.files[0]){
     const f = el.files[0];
@@ -346,6 +362,7 @@ document.addEventListener("change", async e => {
   }
 });
 document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && S.dd){ S.dd = null; render(); return; }
   if (e.key === "Escape" && S.sheet) closeSheet();
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing && (e.target.id === "book-q")){ e.preventDefault(); ACT["ask-book"](); }
 });
@@ -360,6 +377,7 @@ function fromHash(){
   S.view = views.includes(m[0]) ? m[0] : "ask";
   S.sub = (m[1] === "book" || m[1] === "lecture") && Number(m[2]) ? {type: m[1], id: Number(m[2])} : null;
 }
+document.addEventListener("toggle", e => { if (e.target.dataset && e.target.dataset.actToggle === "ai-adv") S.aiAdv = e.target.open; }, true);
 window.addEventListener("popstate", () => { closeSheet(); fromHash(); render.last = null; render(); load(); });
 
 /* ---------- 啟動 ---------- */
