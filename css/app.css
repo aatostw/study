@@ -185,7 +185,7 @@ textarea.input{resize:vertical;line-height:1.6}
 .toast{position:absolute;left:50%;bottom:86px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;z-index:80;max-width:88%;text-align:center;box-shadow:var(--shadow)}
 
 /* ---------- login gate ---------- */
-.gate{position:absolute;inset:0;z-index:50;background:#F5F7FA;overflow:auto;overscroll-behavior:contain}
+.gate{position:absolute;inset:0;z-index:50;background:#F5F7FA;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain}
 .gate .g-deco{position:absolute;pointer-events:none}
 .gate .g-blob1{top:-120px;left:-150px;width:300px;height:280px;background:#E8EDF3;border-radius:0 0 58% 42%/0 0 62% 38%;transform:rotate(-18deg)}
 .gate .g-dots{top:24px;right:20px;width:80px;height:80px;background:radial-gradient(circle,#C5CFDB 2.6px,transparent 3px) 0 0/20px 20px}
