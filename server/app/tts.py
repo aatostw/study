@@ -59,6 +59,8 @@ def synth(text, lang="zh", speed=1.0):
         with open(path, "rb") as f:
             return f.read()
     if config.FAKE:
+        import time
+        time.sleep(0.4)                     # 模擬生成要花時間
         buf = io.BytesIO()
         with wave.open(buf, "wb") as w:
             w.setnchannels(1), w.setsampwidth(2), w.setframerate(16000)

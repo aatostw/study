@@ -62,37 +62,65 @@ async function pollJobs(now){
 }
 
 /* ---------- 朗讀播放 ---------- */
+/* 朗讀播放：嚴格「由上往下」一段一段跟電腦要聲音。
+   電腦的 GPT-SoVITS 一次只能唸一句，同時送好幾個請求的話，排隊順序不保證，
+   常常變成後面的段落先做好、第一段反而最晚。所以這裡一次只要一段：
+   第 1 段好了就開始播，同時在背景接著要第 2、3…段（最多先準備好 AHEAD 段）。 */
 const TTSP = {
-  cache: new Map(), cur: null, fetching: false,
-  url(p){ return apiUrl("/tts/audio", {text: p, lang: S.tts.lang, speed: S.tts.speed}); },
-  audio(p){
-    const k = S.tts.lang + "|" + S.tts.speed + "|" + p;
-    let a = this.cache.get(k);
-    if (!a){
-      a = new Audio(); a.preload = "auto"; a.src = this.url(p);
-      a.addEventListener("canplaythrough", () => { S.tts.ready[p] = true; renderSoon(); }, {once: true});
-      a.addEventListener("error", () => { this.cache.delete(k); }, {once: true});
-      this.cache.set(k, a);
+  AHEAD: 4,
+  urls: new Map(),        // key → blob URL（已經生成好的段落）
+  gen: 0,                 // 換文字、語言、速度或停止時 +1，舊的請求就作廢
+  fetching: false, waiting: -1, cur: null,
+  key(p){ return S.tts.lang + "|" + S.tts.speed + "|" + p; },
+  has(i){ const p = S.tts.parts[i]; return p != null && this.urls.has(this.key(p)); },
+  reset(){ this.gen++; this.waiting = -1; this.fetching = false; this.urls.forEach(u => URL.revokeObjectURL(u)); this.urls.clear(); S.tts.ready = {}; },
+  /* 從目前播放的位置往下，找第一段還沒準備好的，一次只要一段 */
+  async pump(){
+    if (this.fetching) return;
+    const t = S.tts, from = Math.max(0, t.i);
+    let next = -1;
+    for (let j = from; j < t.parts.length && j <= from + this.AHEAD; j++){ if (!this.has(j)){ next = j; break; } }
+    if (next < 0) return;
+    this.fetching = true;
+    const gen = this.gen, p = t.parts[next], k = this.key(p);
+    try {
+      const res = await api("/tts/audio?" + new URLSearchParams({text: p, lang: t.lang, speed: t.speed}).toString(), {raw: true});
+      const blob = await res.blob();
+      if (gen !== this.gen) return;                 // 中途停止或換設定了
+      this.urls.set(k, URL.createObjectURL(blob));
+      t.ready[p] = true; renderSoon();
+      if (this.waiting === next){ this.waiting = -1; this.play(next); }
+    } catch (e) {
+      if (gen !== this.gen) return;
+      S.err.tts = "第 " + (next + 1) + " 段唸不出來：" + errMsg(e);
+      this.stop(); return;
+    } finally {
+      if (gen === this.gen) this.fetching = false;
     }
-    return a;
+    this.pump();
   },
-  /* 一次只先準備後面兩段，電腦的 GPT-SoVITS 一次只能唸一句 */
-  prefetch(i){ for (let j = i + 1; j <= i + 2 && j < S.tts.parts.length; j++) this.audio(S.tts.parts[j]).load(); },
   play(i){
     const t = S.tts;
     if (i >= t.parts.length){ this.stop(); toast("唸完了"); return; }
     $("#au").pause();
     t.i = i; t.playing = true; S.err.tts = "";
-    const a = this.audio(t.parts[i]);
+    if (this.cur){ try { this.cur.pause(); } catch (e) {} }
+    if (!this.has(i)){                              // 還沒好：等它，好了 pump 會叫 play
+      this.waiting = i; this.cur = null; renderSoon(); this.pump(); return;
+    }
+    const a = new Audio(this.urls.get(this.key(t.parts[i])));
     this.cur = a;
+    a.playbackRate = 1;
     a.onended = () => { if (this.cur === a && t.playing) this.play(i + 1); };
-    a.onerror = () => { if (this.cur !== a) return; S.err.tts = "第 " + (i + 1) + " 段唸不出來：確認電腦上的「啟動語音伺服器」開著。"; this.stop(); };
-    a.currentTime = 0;
     a.play().catch(() => {});
-    this.prefetch(i);
     renderSoon();
+    this.pump();                                    // 播放的同時準備後面的段落
   },
-  stop(){ S.tts.playing = false; if (this.cur){ try { this.cur.pause(); } catch (e) {} } this.cur = null; renderSoon(); }
+  stop(){
+    S.tts.playing = false; this.waiting = -1;
+    if (this.cur){ try { this.cur.pause(); } catch (e) {} }
+    this.cur = null; renderSoon();
+  }
 };
 
 async function ttsStart(from){
@@ -101,7 +129,7 @@ async function ttsStart(from){
   if (!t.text.trim()){ toast("先輸入要唸的文字"); return; }
   if (t.splitOf !== t.text || !t.parts.length){
     S.busy.tts = true; render();
-    try { t.parts = (await api("/tts/split", {json: {text: t.text}})).parts; t.splitOf = t.text; t.ready = {}; }
+    try { TTSP.reset(); t.parts = (await api("/tts/split", {json: {text: t.text}})).parts; t.splitOf = t.text; t.ready = {}; }
     catch (e) { S.err.tts = errMsg(e); S.busy.tts = false; render(); return; }
     S.busy.tts = false;
   }
@@ -256,7 +284,7 @@ const ACT = {
   },
 
   /* 朗讀 */
-  "tts-lang": el => { S.tts.lang = el.dataset.v; TTSP.stop(); S.tts.ready = {}; render(); },
+  "tts-lang": el => { S.tts.lang = el.dataset.v; TTSP.stop(); TTSP.reset(); render(); },
   "tts-go": () => { if (S.tts.playing) TTSP.stop(); else ttsStart(0); },
   "tts-from": el => { TTSP.stop(); ttsStart(Number(el.dataset.i)); },
   "tts-download": () => act("ttsDl", () => download("/tts/full", "朗讀.wav", {json: {parts: S.tts.parts, lang: S.tts.lang, speed: S.tts.speed}})),
@@ -329,7 +357,7 @@ document.addEventListener("change", async e => {
     const v = Number(el.value);
     try { const r = await api("/settings", {method: "PUT", json: {prefs: {tts_speed: v}}}); S.settings.prefs = r.prefs; S.tts.speed = null; } catch (err) { toast(errMsg(err)); }
   }
-  if (a === "tts-speed"){ S.tts.speed = Number(el.value); TTSP.stop(); S.tts.ready = {}; render(); }
+  if (a === "tts-speed"){ S.tts.speed = Number(el.value); TTSP.stop(); TTSP.reset(); render(); }
   if (a === "ai-key" && el.value.trim()){
     const p = el.dataset.p;
     await aiSave({keys: {[p]: el.value.trim()}});

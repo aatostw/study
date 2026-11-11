@@ -166,7 +166,7 @@ function renderTts(){
     (S.err.tts ? '<div class="err">' + esc(S.err.tts) + "</div>" : "") + "</section>";
   if (t.parts.length){
     html += '<section class="card"><div class="row between"><div class="label">分段（點一段從那裡開始）</div><span class="tiny muted">準備好 ' + ready + " / " + t.parts.length + "</span></div>" +
-      '<div class="stack">' + t.parts.map((p, i) => '<button class="part' + (i === t.i && t.playing ? " playing" : "") + (t.ready[p] ? " ok" : "") + '" data-act="tts-from" data-i="' + i + '"><span class="st">' + (i === t.i && t.playing ? "▶" : t.ready[p] ? "✓" : i + 1) + '</span><span class="grow">' + esc(p) + "</span></button>").join("") + "</div></section>";
+      '<div class="stack">' + t.parts.map((p, i) => { const now = i === t.i && t.playing; return '<button class="part' + (now ? " playing" : "") + (t.ready[p] ? " ok" : "") + '" data-act="tts-from" data-i="' + i + '"><span class="st">' + (now ? (t.ready[p] ? "▶" : '<span class="spinner" style="width:14px;height:14px"></span>') : t.ready[p] ? "✓" : i + 1) + '</span><span class="grow">' + esc(p) + "</span></button>"; }).join("") + "</div></section>";
   }
   return html;
 }
