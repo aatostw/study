@@ -5,6 +5,7 @@ AI 服務：Gemini、Anthropic（Claude）、OpenAI、自訂 OpenAI 相容（例
 """
 import base64
 import re
+import time
 
 import httpx
 
@@ -28,7 +29,18 @@ TASKS = {
 
 
 class AIError(Exception):
-    pass
+    def __init__(self, msg, status=0):
+        super().__init__(msg)
+        self.status = status
+
+
+# 這些狀態碼是對方暫時忙不過來：等一下再試，或換同一家的其他模型
+BUSY = {429, 500, 502, 503, 504, 529}
+FALLBACK = {
+    "gemini": ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.8-flash"],
+    "anthropic": ["claude-sonnet-5-5", "claude-haiku-5-5"],
+    "openai": ["gpt-5.6-terra", "gpt-5.6-luna"],
+}
 
 
 def settings():
@@ -96,7 +108,7 @@ def _err(r, provider):
         msg = r.text[:300]
     hint = {401: "金鑰不對或過期", 403: "金鑰沒有權限", 404: "模型名稱不對", 429: "用量到上限或太頻繁，稍後再試"}.get(r.status_code, "")
     return AIError("%s 回應錯誤（%d%s）：%s" % (PROVIDERS[provider]["name"], r.status_code,
-                                           "，" + hint if hint else "", str(msg)[:300]))
+                                           "，" + hint if hint else "", str(msg)[:300]), r.status_code)
 
 
 def pick(task):
@@ -114,16 +126,45 @@ def pick(task):
     return s, provider, model
 
 
-def generate(task, prompt, system="", images=None, json_mode=False, max_tokens=8192, provider=None, model=None):
-    """回傳 (文字, '服務/模型')。images: [(mime, bytes)]"""
+def generate(task, prompt, system="", images=None, json_mode=False, max_tokens=8192, provider=None, model=None, budget=None):
+    """回傳 (文字, '服務/模型')。images: [(mime, bytes)]
+    對方太忙（429/503…）時：同一個模型等一下再試兩次，還不行就換同一家的其他模型。
+    budget：最多花幾秒（問答要在 Cloudflare 的 100 秒內回來）；指定 provider+model（測試連線）時不換模型。"""
     if config.FAKE:
         from . import fake
         return fake.generate(task, prompt, json_mode), "fake/fake"
-    if provider and model:
+    explicit = bool(provider and model)
+    if explicit:
         s = settings()
     else:
         s, provider, model = pick(task)
-    images = images or []
+    budget = budget or (60 if task == "ask" else 600)
+    start = time.time()
+    models = [model] if explicit else [model] + [m for m in FALLBACK.get(provider, []) if m != model]
+    if images and not explicit:
+        models = [model]                       # 看圖要特定模型，不亂換
+    waits = [3, 8]
+    last, tried = None, 0
+    for mi, m in enumerate(models):
+        for attempt in range(len(waits) + 1 if mi == 0 else 1):
+            if tried and time.time() - start > budget:
+                break
+            tried += 1
+            try:
+                return _once(s, provider, m, task, prompt, system, images or [], json_mode, max_tokens)
+            except AIError as e:
+                if e.status not in BUSY:
+                    raise
+                last = e
+                print("  [AI] %s %s 忙碌（%d），%s" % (provider, m, e.status, "稍後重試" if mi == 0 and attempt < len(waits) else "換下一個模型"), flush=True)
+                if mi == 0 and attempt < len(waits) and time.time() - start + waits[attempt] < budget:
+                    time.sleep(waits[attempt])
+    raise AIError("%s 目前很忙（%d），已經重試 %d 次%s，還是不行。過幾分鐘再按「再試一次」。" % (
+        PROVIDERS[provider]["name"], last.status if last else 0, tried, "、也換過其他模型" if len(models) > 1 else ""),
+        last.status if last else 0)
+
+
+def _once(s, provider, model, task, prompt, system, images, json_mode, max_tokens):
     base, key = _base(s, provider), _key(s, provider)
     timeout = httpx.Timeout(300, connect=20)
     try:
