@@ -31,6 +31,10 @@ ASR_MODEL = _get("ASR_MODEL", "large-v3-turbo")
 ASR_IDLE_UNLOAD_MIN = _get("ASR_IDLE_UNLOAD_MIN", 10)
 EMBED_MODEL = _get("EMBED_MODEL", "BAAI/bge-m3")
 MAX_UPLOAD_GB = _get("MAX_UPLOAD_GB", 8)
+MODEL_DIR = _get("MODEL_DIR", os.path.join(DATA_DIR, "models"))
+# Hugging Face 下載的模型放 MODEL_DIR（預設會放在 C 槽的使用者資料夾）
+os.makedirs(MODEL_DIR, exist_ok=True)
+os.environ.setdefault("HF_HOME", MODEL_DIR)
 # 測試模式：不載入 Whisper / 向量模型 / 呼叫 AI，用假的結果跑完整流程
 FAKE = _get("FAKE", False)
 

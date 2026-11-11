@@ -22,7 +22,7 @@
 
 ## 一、電腦端（只要做一次）
 
-1. **放好資料夾**：把 `server` 資料夾複製到電腦上，例如 `D:\study-server`。
+1. **放好資料夾**：把 `server` 資料夾複製到電腦上，例如 `D:\Study Natursai\server`。
 2. **安裝三樣軟體**（開「命令提示字元」執行）：
    ```
    winget install Python.Python.3.11
@@ -30,7 +30,7 @@
    winget install Gyan.FFmpeg
    ```
    Docker Desktop 裝好後打開一次，等它顯示 *Engine running*。設定裡記得勾選「開機時啟動」。
-3. **看一下 `study_config.py`**：GPT-SoVITS 資料夾、資料存放位置（預設 `D:\StudyData`）、固定網址。一般不用改。
+3. **看一下 `study_config.py`**：GPT-SoVITS 資料夾、資料存放位置（預設 `D:\Study Natursai\data`）、固定網址。一般不用改。
 4. **依序雙擊**：
    - `安裝.bat`：安裝 Python 套件，包含有 CUDA 的 PyTorch，大約 3 GB。
    - `安裝資料庫.bat`：在 Docker 裡開 PostgreSQL + pgvector。
@@ -82,7 +82,7 @@
 ### 錄音怎麼傳到電腦
 
 - **App 內上傳**（推薦）：手機會把檔案切成每塊 32 MB，經過 Worker 直接傳到電腦，所以能避開 Cloudflare 一次最多 100 MB 的限制。中途斷線會自動重傳那一塊。
-- **電腦待處理資料夾**：把檔案放進 `D:\StudyData\待處理`（用 OneDrive、隨身碟都可以），App 的「課程」頁就會列出來，按「匯入」即可。
+- **電腦待處理資料夾**：把檔案放進 `D:\Study Natursai\待處理`（用 OneDrive、隨身碟都可以），App 的「課程」頁就會列出來，按「匯入」即可。
 
 ---
 
@@ -96,5 +96,5 @@
   再把 `study_config.py` 的 `ASR_MODEL` 改成 `r"D:\models\breeze-asr-25"`。
 - **顯存**：Whisper 閒置 10 分鐘會自動從顯示卡卸下，把空間讓給 GPT-SoVITS。
 - **朗讀**：直接呼叫 GPT-SoVITS 的 api_v2，沿用 `voice_server.py` 裡的參考音檔設定，所以「啟動語音伺服器.bat」要開著。如果每日英文的跟讀和這裡的朗讀剛好同時在唸，GPT-SoVITS 可能會互搶，等一下再按就好。
-- **備份**：雙擊 `備份資料庫.bat`，檔案會存到 `D:\StudyData\backup`。原始影音放在 `D:\StudyData\media`。
+- **備份**：雙擊 `備份資料庫.bat`，檔案會存到 `D:\Study Natursai\backup`。原始影音放在 `D:\Study Natursai\data\media`。
 - **測試模式**：設定環境變數 `STUDY_FAKE=1` 再啟動，不需要 GPU 和金鑰，會用假的結果把整個流程跑一遍。
