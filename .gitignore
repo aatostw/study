@@ -1,0 +1,7 @@
+# 只在電腦上的東西，不要推上 GitHub
+server/.venv/
+server/study_server_key.txt
+server/*.log
+server/data/
+__pycache__/
+*.pyc

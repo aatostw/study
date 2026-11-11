@@ -1,0 +1,17 @@
+# 學習筆記的資料庫：PostgreSQL 17 + pgvector
+# 雙擊「安裝資料庫.bat」會用這個檔案建立，之後 Docker Desktop 開機就會自動跑起來。
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: study-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: study
+      POSTGRES_PASSWORD: study-local-only
+      POSTGRES_DB: study
+    ports:
+      - "127.0.0.1:5433:5432"     # 只有這台電腦連得到
+    volumes:
+      - study-pgdata:/var/lib/postgresql/data
+volumes:
+  study-pgdata:

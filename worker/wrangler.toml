@@ -1,0 +1,15 @@
+# 部署：在這個資料夾執行  npx wrangler deploy
+# 也可以直接在 Cloudflare 網頁新增 Worker，把 study-api.js 整個貼上（跟 eel-api 一樣）。
+name = "study-api"
+main = "study-api.js"
+compatibility_date = "2026-01-01"
+routes = [{ pattern = "study-api.natursai.com", custom_domain = true }]
+
+[vars]
+ORIGIN = "https://study-pc.natursai.com"
+ALLOW_ORIGIN = "https://study.natursai.com"
+
+# Secret 不要寫在這裡，用指令設定：
+#   npx wrangler secret put STUDY_PASSWORD
+#   npx wrangler secret put STUDY_KEY
+#   npx wrangler secret put TOKEN_SECRET

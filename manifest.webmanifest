@@ -1,0 +1,14 @@
+{
+  "name": "學習筆記",
+  "short_name": "學習筆記",
+  "description": "讀書筆記、課程錄音整理、AI 知識庫問答與朗讀。",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFFFF",
+  "theme_color": "#39648D",
+  "lang": "zh-Hant-TW",
+  "icons": [{"src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}]
+}

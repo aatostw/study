@@ -1,0 +1,356 @@
+"use strict";
+/* =========================================================
+   登入、所有按鈕的動作、朗讀播放、工作進度、啟動
+   ========================================================= */
+
+/* ---------- 登入 ---------- */
+function showGate(msg){
+  const g = $("#gate");
+  $("#tabs").hidden = true;
+  g.innerHTML = '<div class="g-deco g-blob1"></div><div class="g-deco g-dots"></div><div class="g-deco g-blob2"></div><div class="g-deco g-blob3"></div>' +
+    '<form class="g-in" id="login-form"><div class="g-logo"><svg width="56" height="56" viewBox="0 0 30 30" aria-hidden="true"><rect x="2" y="7" width="17" height="19" rx="5" fill="#39648D"/><rect x="10" y="3" width="17" height="19" rx="5" fill="#48A88B"/><circle cx="23" cy="24" r="4" fill="#F3CC58"/></svg></div>' +
+    '<div class="g-brand">NATURSAI</div><h1 class="g-title">學習筆記</h1>' +
+    '<label class="g-field">' + ICON.lock + '<input type="password" id="g-pw" placeholder="密碼" autocomplete="current-password" required></label>' +
+    '<button class="g-btn" id="g-go" type="submit">登入</button><div class="g-err" id="g-err">' + esc(msg || "") + "</div>" +
+    '<div class="g-foot">只有你自己能用。資料存在你的電腦。</div></form>';
+  g.hidden = false;
+  $("#login-form").onsubmit = async e => {
+    e.preventDefault();
+    const btn = $("#g-go"), pw = $("#g-pw").value;
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>登入中';
+    try {
+      const res = await fetch(S.api + "/login", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({password: pw})});
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || !j.token) throw new Error(j.error || "登入失敗（" + res.status + "）");
+      S.token = j.token; lsSet("token", j.token);
+      g.hidden = true; g.innerHTML = "";
+      render(); load(); pollJobs(true);
+    } catch (err) {
+      $("#g-err").textContent = err.message === "Failed to fetch" ? "連不到伺服器，確認網路，或到設定檢查網址。" : err.message;
+      btn.disabled = false; btn.textContent = "登入";
+    }
+  };
+  setTimeout(() => { const i = $("#g-pw"); if (i) i.focus(); }, 50);
+}
+
+/* ---------- 工作進度：有東西在跑就每 3 秒問一次 ---------- */
+let pollTimer = null;
+async function pollJobs(now){
+  clearTimeout(pollTimer);
+  if (!S.token) return;
+  if (!now){ pollTimer = setTimeout(() => pollJobs(true), 3000); return; }
+  try {
+    const before = new Map((S.jobs || []).map(j => [j.id, j.status]));
+    S.jobs = (await api("/jobs?active=1")).jobs;
+    let changed = false;
+    for (const j of S.jobs){
+      if ((j.status === "done" || j.status === "error") && before.get(j.id) && before.get(j.id) !== j.status){
+        changed = true;
+        if (j.status === "done") toast({lecture: "課程處理好了：", resummarize: "重新摘要好了：", bookfile: "原文讀好了：", analyze: "分析好了："}[j.kind] + j.title);
+      }
+    }
+    if (changed){
+      if (S.sub && S.sub.type === "lecture") loadLecture().catch(() => {});
+      else if (S.sub && S.sub.type === "book") loadBook().catch(() => {});
+      else if (S.view === "lectures") loadLectures().catch(() => {});
+      else if (S.view === "books") loadBooks().catch(() => {});
+    }
+    renderSoon();
+  } catch (e) {}
+  const busy = (S.jobs || []).some(j => j.status === "queued" || j.status === "running") || S.uploads.some(u => u.state === "sending" || u.state === "finishing");
+  pollTimer = setTimeout(() => pollJobs(true), busy ? 3000 : 30000);
+}
+
+/* ---------- 朗讀播放 ---------- */
+const TTSP = {
+  cache: new Map(), cur: null, fetching: false,
+  url(p){ return apiUrl("/tts/audio", {text: p, lang: S.tts.lang, speed: S.tts.speed}); },
+  audio(p){
+    const k = S.tts.lang + "|" + S.tts.speed + "|" + p;
+    let a = this.cache.get(k);
+    if (!a){
+      a = new Audio(); a.preload = "auto"; a.src = this.url(p);
+      a.addEventListener("canplaythrough", () => { S.tts.ready[p] = true; renderSoon(); }, {once: true});
+      a.addEventListener("error", () => { this.cache.delete(k); }, {once: true});
+      this.cache.set(k, a);
+    }
+    return a;
+  },
+  /* 一次只先準備後面兩段，電腦的 GPT-SoVITS 一次只能唸一句 */
+  prefetch(i){ for (let j = i + 1; j <= i + 2 && j < S.tts.parts.length; j++) this.audio(S.tts.parts[j]).load(); },
+  play(i){
+    const t = S.tts;
+    if (i >= t.parts.length){ this.stop(); toast("唸完了"); return; }
+    $("#au").pause();
+    t.i = i; t.playing = true; S.err.tts = "";
+    const a = this.audio(t.parts[i]);
+    this.cur = a;
+    a.onended = () => { if (this.cur === a && t.playing) this.play(i + 1); };
+    a.onerror = () => { if (this.cur !== a) return; S.err.tts = "第 " + (i + 1) + " 段唸不出來：確認電腦上的「啟動語音伺服器」開著。"; this.stop(); };
+    a.currentTime = 0;
+    a.play().catch(() => {});
+    this.prefetch(i);
+    renderSoon();
+  },
+  stop(){ S.tts.playing = false; if (this.cur){ try { this.cur.pause(); } catch (e) {} } this.cur = null; renderSoon(); }
+};
+
+async function ttsStart(from){
+  const t = S.tts, box = $("#tts-text");
+  if (box) t.text = box.value;
+  if (!t.text.trim()){ toast("先輸入要唸的文字"); return; }
+  if (t.splitOf !== t.text || !t.parts.length){
+    S.busy.tts = true; render();
+    try { t.parts = (await api("/tts/split", {json: {text: t.text}})).parts; t.splitOf = t.text; t.ready = {}; }
+    catch (e) { S.err.tts = errMsg(e); S.busy.tts = false; render(); return; }
+    S.busy.tts = false;
+  }
+  TTSP.play(from || 0);
+}
+
+/* ---------- 下載檔案（匯出、朗讀）---------- */
+async function download(path, name, opt){
+  const res = await api(path, Object.assign({raw: true}, opt || {}));
+  const blob = await res.blob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+const safeName = s => String(s || "export").replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60);
+
+function findSource(ctx, n){
+  const list = ctx === "ask" ? S.ask.cur && S.ask.cur.sources : ctx === "book" ? S.ask.book && S.ask.book.sources
+    : ctx === "lec" ? S.ask.lec && S.ask.lec.sources : ctx === "analysis" ? S.book && S.book.book.analysis && S.book.book.analysis.sources : null;
+  return (list || []).find(s => String(s.n) === String(n));
+}
+
+async function act(name, fn){
+  S.busy[name] = true; S.err[name] = ""; render();
+  try { await fn(); } catch (e) { if (!e.relogin){ S.err[name] = errMsg(e); toast(errMsg(e)); } }
+  S.busy[name] = false; render();
+}
+
+/* ---------- 所有按鈕 ---------- */
+const ACT = {
+  "tab": el => { closeSheet(); go(el.dataset.v); },
+  "back": () => { closeSheet(); go(S.view); },
+  "reload": () => { S.err.load = ""; render(); load(); },
+  "close-sheet": () => closeSheet(),
+  "job-retry": el => act("retry", async () => { await api("/jobs/" + el.dataset.id + "/retry", {method: "POST"}); pollJobs(true); load(); }),
+  "up-retry": el => Up.retry(el.dataset.key),
+
+  /* 問答 */
+  "ask-scope": el => { S.ask.scope = el.dataset.v; render(); },
+  "ask": () => {
+    const q = ($("#ask-q").value || "").trim();
+    if (!q) return toast("先輸入問題");
+    S.ask.draft = q;
+    act("ask", async () => { S.ask.cur = await api("/ask", {json: {question: q, scope: S.ask.scope}}); S.ask.draft = ""; loadAsks().catch(() => {}); });
+  },
+  "ask-open": el => { const x = (S.asks || []).find(a => String(a.id) === el.dataset.id); if (x){ S.ask.cur = x; render(); $("#main").scrollTop = 0; } },
+  "ask-del": el => act("askdel", async () => { await api("/asks/" + el.dataset.id, {method: "DELETE"}); S.ask.cur = null; await loadAsks(); }),
+  "src": el => { const s = findSource(el.dataset.ctx, el.dataset.n); if (s) sourceSheet(s); },
+
+  /* 書 */
+  "open-book": el => { closeSheet(); S.book = null; S.view = "books"; go("books", {type: "book", id: Number(el.dataset.id)}); },
+  "book-new": () => openSheet('<h2>新增一本書</h2><div class="field"><label for="b-title">書名</label><input class="input" id="b-title" placeholder="道德經"></div>' +
+    '<div class="field"><label for="b-author">作者</label><input class="input" id="b-author" placeholder="老子"></div><button class="btn block" data-act="book-create">新增</button>'),
+  "book-create": () => {
+    const title = $("#b-title").value.trim();
+    if (!title) return toast("請填書名");
+    act("bookc", async () => { const r = await api("/books", {json: {title, author: $("#b-author").value.trim()}}); closeSheet(); S.books = null; go("books", {type: "book", id: r.book.id}); });
+  },
+  "book-edit": () => { const b = S.book.book; openSheet('<h2>編輯書的資料</h2><div class="field"><label for="b-title">書名</label><input class="input" id="b-title" value="' + esc(b.title) + '"></div>' +
+    '<div class="field"><label for="b-author">作者</label><input class="input" id="b-author" value="' + esc(b.author) + '"></div><button class="btn block" data-act="book-save">儲存</button>' +
+    '<button class="btn ghost block" data-act="book-del" style="color:var(--danger)">刪除這本書（含所有筆記）</button>'); },
+  "book-save": () => act("books", async () => { await api("/books/" + S.sub.id, {method: "PATCH", json: {title: $("#b-title").value, author: $("#b-author").value}}); closeSheet(); S.books = null; await loadBook(); }),
+  "book-del": async () => {
+    if (!(await confirmBox("刪除這本書？", "書、所有筆記、上傳的原文和分析都會刪除，無法復原。", "刪除", true))) return;
+    act("bookd", async () => { await api("/books/" + S.sub.id, {method: "DELETE"}); closeSheet(); S.books = null; go("books"); });
+  },
+  "pick-book": el => { S.bookTarget = el.dataset.id ? Number(el.dataset.id) : 0; $("#pick-book").value = ""; $("#pick-book").click(); },
+  "pick-photo": () => { $("#pick-photo").value = ""; $("#pick-photo").click(); },
+  "note-new": () => noteSheet({}),
+  "note-edit": el => noteSheet(S.book.notes.find(n => String(n.id) === el.dataset.id) || {}),
+  "note-save": el => {
+    const body = {quote: $("#n-quote").value, content: $("#n-content").value, chapter: $("#n-chapter").value, page: $("#n-page").value, source: el.dataset.source};
+    if (!body.quote.trim() && !body.content.trim()) return toast("摘句和想法至少填一個");
+    act("note", async () => {
+      if (el.dataset.id) await api("/notes/" + el.dataset.id, {method: "PATCH", json: body});
+      else await api("/books/" + S.sub.id + "/notes", {json: body});
+      closeSheet(); toast("存好了"); await loadBook();
+      setTimeout(() => loadBook().catch(() => {}), 6000);         // 看索引好了沒
+    });
+  },
+  "note-del": async el => {
+    if (!(await confirmBox("刪除這則筆記？", "刪除後無法復原。", "刪除", true))) return;
+    act("noted", async () => { await api("/notes/" + el.dataset.id, {method: "DELETE"}); await loadBook(); });
+  },
+  "analyze": el => act("analyze", async () => { await api("/books/" + el.dataset.id + "/analyze", {method: "POST"}); toast("開始分析，大約一分鐘"); pollJobs(true); await loadBook(); }),
+  "book-export": el => act("export", () => download("/books/" + el.dataset.id + "/export", safeName(S.book.book.title) + ".md")),
+  "ask-book": () => {
+    const q = ($("#book-q").value || "").trim();
+    if (!q) return toast("先輸入問題");
+    const bid = S.sub.id;
+    act("askBook", async () => { const r = await api("/ask", {json: {question: q, scope: "book:" + bid}}); r.bookId = bid; S.ask.book = r; S.ask.bookDraft = ""; });
+  },
+
+  /* 課程 */
+  "pick-lecture": () => { $("#pick-lecture").value = ""; $("#pick-lecture").click(); },
+  "form-lang": el => { S.formLang = el.dataset.v; document.querySelectorAll("#l-lang button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === S.formLang)); },
+  "lecture-go": () => {
+    const meta = {course: $("#l-course").value.trim(), title: $("#l-title").value.trim(), lang: S.formLang, terms: $("#l-terms").value.trim()};
+    S.lastCourse = meta.course; S.lastTerms = meta.terms; S.lastLang = meta.lang;
+    closeSheet();
+    if (S.pendingFile){ Up.start(S.pendingFile, "lecture", meta); S.pendingFile = null; }
+    else if (S.pendingInbox){
+      const name = S.pendingInbox; S.pendingInbox = null;
+      act("inbox", async () => { await api("/inbox/import", {json: {name, kind: "lecture", meta}}); toast("匯入了，電腦開始處理"); pollJobs(true); loadInbox(); await loadLectures(); });
+    }
+  },
+  "inbox-refresh": () => loadInbox(),
+  "inbox-import": el => lectureForm(null, el.dataset.name),
+  "open-lecture": el => {
+    closeSheet();
+    const id = Number(el.dataset.id);
+    if (el.dataset.t != null && el.dataset.t !== "") S.pendingSeek = Number(el.dataset.t);
+    if (S.sub && S.sub.type === "lecture" && S.sub.id === id && S.pendingSeek != null){ const t = S.pendingSeek; S.pendingSeek = null; S.lecTab = "tr"; render(); seek(t); return; }
+    S.lecTab = S.pendingSeek != null ? "tr" : "sum";
+    go("lectures", {type: "lecture", id});
+  },
+  "lec-tab": el => { S.lecTab = el.dataset.v; render(); },
+  "seek": el => seek(Number(el.dataset.t)),
+  "play": () => { const au = $("#au"); if (au.paused){ TTSP.stop(); au.play().catch(() => toast("播放失敗")); } else au.pause(); },
+  "rate": () => { const r = [1, 1.25, 1.5, 1.75, 2, 0.75]; S.rate = r[(r.indexOf(S.rate || 1) + 1) % r.length]; $("#au").playbackRate = S.rate; const b = $("#pl-rate"); if (b) b.textContent = S.rate + "×"; },
+  "lec-tts": () => {
+    const s = S.lecture.lecture.summary, l = S.lecture.lecture;
+    const lines = [l.title + "。", s.overview || ""];
+    (s.sections || []).forEach(sec => { lines.push(sec.title + "。" + (sec.summary || "")); (sec.points || []).forEach(p => lines.push(p.text)); });
+    S.tts.text = lines.filter(Boolean).join("\n"); S.tts.parts = []; S.tts.lang = "zh";
+    go("tts");
+  },
+  "lec-export": () => act("export", () => download("/lectures/" + S.sub.id + "/export", safeName(S.lecture.lecture.title) + ".md")),
+  "lec-resum": () => act("resum", async () => { await api("/lectures/" + S.sub.id + "/resummarize", {method: "POST"}); toast("開始重新摘要"); pollJobs(true); await loadLecture(); }),
+  "lec-retrans": async () => {
+    if (!(await confirmBox("重新轉逐字稿？", "會刪掉現在的逐字稿和摘要，用最新的術語重新辨識。", "重新轉"))) return;
+    act("retrans", async () => { await api("/lectures/" + S.sub.id + "/retranscribe", {method: "POST"}); pollJobs(true); await loadLecture(); });
+  },
+  "lec-edit": () => lectureEditSheet(S.lecture.lecture),
+  "lec-save": () => act("lecs", async () => { await api("/lectures/" + S.sub.id, {method: "PATCH", json: {course: $("#le-course").value, title: $("#le-title").value, terms: $("#le-terms").value}}); closeSheet(); S.lectures = null; await loadLecture(); }),
+  "lec-del": async () => {
+    if (!(await confirmBox("刪除這堂課？", "錄音、逐字稿、摘要都會刪除，無法復原。", "刪除", true))) return;
+    act("lecd", async () => { await api("/lectures/" + S.sub.id, {method: "DELETE"}); setAudio(null); S.lectures = null; go("lectures"); });
+  },
+  "ask-lec": () => {
+    const q = ($("#lec-q").value || "").trim();
+    if (!q) return toast("先輸入問題");
+    const lid = S.sub.id;
+    act("askLec", async () => { const r = await api("/ask", {json: {question: q, scope: "lecture:" + lid}}); r.lid = lid; S.ask.lec = r; S.ask.lecDraft = ""; });
+  },
+
+  /* 朗讀 */
+  "tts-lang": el => { S.tts.lang = el.dataset.v; TTSP.stop(); S.tts.ready = {}; render(); },
+  "tts-go": () => { if (S.tts.playing) TTSP.stop(); else ttsStart(0); },
+  "tts-from": el => { TTSP.stop(); ttsStart(Number(el.dataset.i)); },
+  "tts-download": () => act("ttsDl", () => download("/tts/full", "朗讀.wav", {json: {parts: S.tts.parts, lang: S.tts.lang, speed: S.tts.speed}})),
+
+  /* 設定 */
+  "status-refresh": () => { S.status = null; render(); loadStatus().catch(e => toast(errMsg(e))); },
+  "keys-save": () => {
+    const keys = {};
+    ["gemini", "anthropic", "openai", "custom"].forEach(p => { const v = ($("#k-" + p) || {}).value; if (v && v.trim()) keys[p] = v.trim(); });
+    act("keys", async () => { const r = await api("/settings", {method: "PUT", json: {ai: {keys, custom_base: $("#k-custom-base").value}}}); S.settings.ai = r.ai; toast("金鑰存好了"); });
+  },
+  "key-del": el => act("keys", async () => { const r = await api("/settings", {method: "PUT", json: {ai: {keys: {[el.dataset.p]: "-"}}}}); S.settings.ai = r.ai; }),
+  "m-list": el => {
+    const t = el.dataset.task, m = (S.modelDraft || {})[t] || S.settings.ai.models[t];
+    act("ml" + m.provider, async () => { S.models[m.provider] = (await api("/ai/models?provider=" + m.provider)).models; toast("找到 " + S.models[m.provider].length + " 個模型，點模型名稱的欄位挑選"); });
+  },
+  "m-test": el => {
+    const t = el.dataset.task, m = (S.modelDraft || {})[t] || S.settings.ai.models[t];
+    S.test = S.test || {};
+    act("mt" + t, async () => {
+      try { const r = await api("/ai/test", {json: m}); S.test[t] = "✓ 可以用（" + (r.ms / 1000).toFixed(1) + " 秒）"; }
+      catch (e) { S.test[t] = "✗ " + errMsg(e); }
+    });
+  },
+  "models-save": () => {
+    const models = Object.assign({}, S.settings.ai.models, S.modelDraft || {});
+    act("models", async () => { const r = await api("/settings", {method: "PUT", json: {ai: {models}}}); S.settings.ai = r.ai; S.modelDraft = null; toast("模型設定存好了"); });
+  },
+  "pref": el => act("pref", async () => { const r = await api("/settings", {method: "PUT", json: {prefs: {[el.dataset.k]: el.dataset.v}}}); S.settings.prefs = r.prefs; }),
+  "api-save": () => { S.api = $("#api-url").value.trim().replace(/\/+$/, "") || DEFAULT_API; lsSet("api", S.api); toast("網址存好了"); load(); },
+  "logout": async () => { if (await confirmBox("登出？", "這支手機要重新輸入密碼才能用。", "登出")) logout(); }
+};
+
+/* ---------- 事件 ---------- */
+document.addEventListener("click", e => {
+  const el = e.target.closest("[data-act]");
+  if (!el || el.disabled) return;
+  const fn = ACT[el.dataset.act];
+  if (fn){ e.preventDefault(); fn(el, e); }
+});
+document.addEventListener("input", e => {
+  const el = e.target, d = el.dataset && el.dataset.draft;
+  if (d === "ask") S.ask.draft = el.value;
+  else if (d === "bookq") S.ask.bookDraft = el.value;
+  else if (d === "lecq") S.ask.lecDraft = el.value;
+  else if (d === "tts") S.tts.text = el.value;
+  else if (d === "tr"){ S.trFilter = el.value; clearTimeout(ACT._tr); ACT._tr = setTimeout(() => render(), 250); }
+  if (el.id === "tts-speed"){ $("#tts-speed-v").textContent = Number(el.value).toFixed(1) + "×"; }
+  if (el.id === "pl-seek"){ $("#au").currentTime = Number(el.value); }
+});
+document.addEventListener("change", async e => {
+  const el = e.target, a = el.dataset && el.dataset.actChange;
+  if (a === "tts-speed"){ S.tts.speed = Number(el.value); TTSP.stop(); S.tts.ready = {}; render(); }
+  if (a === "m-provider" || a === "m-model"){
+    const t = el.dataset.task;
+    S.modelDraft = S.modelDraft || {};
+    const cur = S.modelDraft[t] || Object.assign({}, S.settings.ai.models[t]);
+    if (a === "m-provider"){ cur.provider = el.value; cur.model = ""; }
+    else cur.model = el.value.trim();
+    S.modelDraft[t] = cur;
+    if (a === "m-provider") render();
+  }
+  if (el.id === "pick-lecture" && el.files[0]) lectureForm(el.files[0]);
+  if (el.id === "pick-book" && el.files[0]){
+    const f = el.files[0];
+    Up.start(f, "book", S.bookTarget ? {book_id: S.bookTarget} : {title: f.name.replace(/\.[^.]+$/, "")});
+    if (!S.sub && S.view !== "books") go("books");
+  }
+  if (el.id === "pick-photo" && el.files[0]){
+    const f = el.files[0];
+    S.busy.ocr = true; render();
+    try {
+      const blob = await shrinkImage(f);
+      const r = await api("/ocr", {method: "POST", body: blob, headers: {"Content-Type": "image/jpeg"}});
+      noteSheet({quote: r.text, page: r.page, source: "photo"});
+      toast("辨識好了，確認一下再存");
+    } catch (err) { toast(errMsg(err)); }
+    S.busy.ocr = false; render();
+  }
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && S.sheet) closeSheet();
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing && (e.target.id === "book-q")){ e.preventDefault(); ACT["ask-book"](); }
+});
+const AU = $("#au");
+["timeupdate", "play", "pause", "loadedmetadata"].forEach(ev => AU.addEventListener(ev, () => playerTick()));
+function afterRender(){ playerTick(); }
+
+/* ---------- 網址 #books/book/3 ---------- */
+function fromHash(){
+  const m = location.hash.slice(1).split("/");
+  const views = ["ask", "books", "lectures", "tts", "prefs"];
+  S.view = views.includes(m[0]) ? m[0] : "ask";
+  S.sub = (m[1] === "book" || m[1] === "lecture") && Number(m[2]) ? {type: m[1], id: Number(m[2])} : null;
+}
+window.addEventListener("popstate", () => { closeSheet(); fromHash(); render.last = null; render(); load(); });
+
+/* ---------- 啟動 ---------- */
+(function boot(){
+  fromHash();
+  if (!S.token){ showGate(); return; }
+  render(); load(); pollJobs(true);
+})();
