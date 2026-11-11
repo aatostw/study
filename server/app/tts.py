@@ -7,6 +7,7 @@ import hashlib
 import io
 import os
 import re
+import socket
 import threading
 import wave
 
@@ -39,10 +40,11 @@ def _voice_settings():
 
 
 def status():
+    """只看 9880 埠有沒有在聽，不送朗讀請求（空的請求會讓 GPT-SoVITS 在紀錄檔裡報錯）"""
     try:
-        r = httpx.get(API + "/tts", timeout=3)
-        return "ready" if r.status_code in (200, 400, 422) else "error"
-    except httpx.HTTPError:
+        with socket.create_connection(("127.0.0.1", 9880), timeout=2):
+            return "ready"
+    except OSError:
         return "offline"
 
 
