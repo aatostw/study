@@ -13,6 +13,16 @@ const CHECK = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" strok
 const EYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 const KEY_URL = {gemini: "https://aistudio.google.com/apikey", anthropic: "https://console.anthropic.com/settings/keys", openai: "https://platform.openai.com/api-keys"};
 const PROVIDER_ORDER = ["gemini", "anthropic", "openai", "custom"];
+/* 常用模型（跟每日英文同一份）；paid = 需付費。清單外的可以選「自訂」自己輸入 */
+const MODEL_PRESETS = {
+  gemini: [{id: "gemini-3.5-flash-lite"}, {id: "gemini-3.6-flash"}, {id: "gemini-3.8-flash"}, {id: "gemini-4-argon", paid: true}],
+  anthropic: [{id: "claude-haiku-5-5", paid: true}, {id: "claude-sonnet-5-5", paid: true}, {id: "claude-opus-5-5", paid: true}],
+  openai: [{id: "gpt-5.6-luna", paid: true}, {id: "gpt-5.6-terra", paid: true}, {id: "gpt-5.6-sol", paid: true}],
+  custom: []
+};
+const MODEL_DEFAULT = {gemini: "gemini-3.6-flash", anthropic: "claude-sonnet-5-5", openai: "gpt-5.6-terra", custom: ""};
+const PAID = '<span class="paid-badge" title="需付費" aria-label="需付費">$</span>';
+function isPaid(p, id){ return ((MODEL_PRESETS[p] || []).find(m => m.id === id) || {}).paid; }
 
 /* 「預設」= 問答用的那組；其他工作沒有另外指定的話，就跟著它 */
 function aiDefault(){ const a = S.settings.ai; return a.models.ask || {provider: "", model: ""}; }
@@ -43,11 +53,12 @@ function renderPrefs(){
 }
 
 /* ---------- 自訂下拉選單（跟每日英文一樣）---------- */
+/* options: [值, 文字, 額外 HTML（例如 $ 標示）] */
 function dd(id, label, options, cur, extraCls){
   const sel = options.find(o => o[0] === cur);
-  return '<div class="dd"><button class="dd-btn ' + (extraCls || "") + '" id="' + id + '" data-act="dd-toggle" data-dd="' + id + '" aria-haspopup="listbox" aria-expanded="' + (S.dd === id) + '"><span>' + esc(sel ? sel[1] : "請選擇") + "</span>" + CHEV + "</button>" +
+  return '<div class="dd"><button class="dd-btn ' + (extraCls || "") + '" id="' + id + '" data-act="dd-toggle" data-dd="' + id + '" aria-haspopup="listbox" aria-expanded="' + (S.dd === id) + '"><span class="row" style="gap:8px">' + esc(sel ? sel[1] : "請選擇") + (sel && sel[2] ? sel[2] : "") + "</span>" + CHEV + "</button>" +
     (S.dd === id ? '<div class="dd-list ' + (extraCls || "") + '" role="listbox" aria-label="' + esc(label) + '">' + options.map(o =>
-      '<button class="dd-opt" role="option" aria-selected="' + (o[0] === cur) + '" data-act="dd-pick" data-dd="' + id + '" data-val="' + esc(o[0]) + '"><span>' + esc(o[1]) + "</span>" + (o[0] === cur ? '<span class="check">' + CHECK + "</span>" : "") + "</button>").join("") + "</div>" : "") + "</div>";
+      '<button class="dd-opt" role="option" aria-selected="' + (o[0] === cur) + '" data-act="dd-pick" data-dd="' + id + '" data-val="' + esc(o[0]) + '"><span>' + esc(o[1]) + "</span>" + (o[2] || "") + (o[0] === cur ? '<span class="check">' + CHECK + "</span>" : "") + "</button>").join("") + "</div>" : "") + "</div>";
 }
 
 /* ---------- 電腦狀態 ---------- */
@@ -78,16 +89,19 @@ function aiPage(){
   const st = S.settings;
   if (!st) return loading();
   const a = st.ai, d = aiDefault(), p = d.provider || S.aiProv || "", P = a.providers;
-  const list = S.models[p] || [];
+  const presets = MODEL_PRESETS[p] || [];
   const provDd = dd("ai-prov", "AI 服務", PROVIDER_ORDER.map(q => [q, P[q]]), p);
-  let model;
-  if (list.length){
-    const opts = list.map(m => [m, m]);
-    if (d.model && !list.includes(d.model)) opts.unshift([d.model, d.model]);
-    model = dd("ai-model", "模型", opts, d.model, "en");
-  } else {
-    model = '<input class="input en" id="ai-model-text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="' + (p ? (S.busy["ml" + p] ? "正在載入模型清單…" : "輸入模型名稱，或先填金鑰載入清單") : "先選 AI 服務") + '" value="' + esc(d.model || "") + '" data-act-change="ai-model-text"' + (p ? "" : " disabled") + ">";
+  const inPreset = presets.some(m => m.id === d.model);
+  const custom = p && (S.aiCustom || !presets.length || (d.model && !inPreset));
+  let model = "";
+  if (p && presets.length){
+    const opts = presets.map(m => [m.id, m.id, m.paid ? PAID : ""]).concat([["__custom", "自訂…"]]);
+    model = dd("ai-model", "模型", opts, custom ? "__custom" : d.model, "en");
   }
+  if (custom){
+    model += '<input class="input en" id="ai-model-text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="輸入模型名稱" value="' + esc(inPreset ? "" : d.model || "") + '" data-act-change="ai-model-text"' + (presets.length ? ' style="margin-top:8px"' : "") + ">";
+  }
+  if (!p) model = '<input class="input" disabled placeholder="先選 AI 服務">';
   const keyField = !p ? "" :
     '<div class="field"><div class="row between"><label for="ai-key">API Key' + (p === "custom" ? ' <span class="muted" style="font-weight:400">（選填）</span>' : "") + "</label>" +
     (KEY_URL[p] ? '<a class="small" href="' + KEY_URL[p] + '" target="_blank" rel="noopener">取得 API Key ↗</a>' : "") + "</div>" +
@@ -97,20 +111,21 @@ function aiPage(){
   const tr = S.aiTest;
   let html = '<section class="card ai-card"><h2 style="font-size:20px">AI 模型</h2>' +
     '<div class="field"><label for="ai-prov">AI 服務</label>' + provDd + "</div>" +
-    '<div class="field"><div class="row between"><label for="ai-model">模型</label>' + (p && (a.keys[p] || p === "custom") ? '<button class="btn ghost sm" style="padding:2px 4px;min-height:0" data-act="m-reload">' + (S.busy["ml" + p] ? '<span class="spinner"></span>' : "") + "重新載入清單</button>" : "") + "</div>" + model + "</div>" +
+    '<div class="field"><label for="ai-model">模型</label>' + model + "</div>" +
     keyField +
-    '<p class="muted small" style="margin:0">金鑰存在你的電腦，手機和 Cloudflare 都拿不到。</p>' +
+    (presets.some(m => m.paid) ? '<p class="muted small" style="margin:0">標示 ' + PAID + ' 的模型需付費。</p>' : "") +
     (tr ? '<div class="' + (tr.ok ? "note ok" : "err") + '">' + esc(tr.msg) + "</div>" : "") +
     '<div class="row" style="justify-content:flex-end"><button class="btn green" data-act="ai-test"' + (S.busy.aiTest || !d.model ? " disabled" : "") + ">" + (S.busy.aiTest ? '<span class="spinner"></span>測試中' : "測試連線") + "</button></div></section>";
 
   /* 進階：個別工作換模型（例如拍照辨識要能看圖、課程摘要想用更強的） */
   const others = Object.keys(a.tasks).filter(t => t !== "ask");
+  const withKey = PROVIDER_ORDER.filter(q => a.keys[q] || q === d.provider);
   html += '<section class="card ai-card"><details' + (S.aiAdv ? " open" : "") + ' data-act-toggle="ai-adv"><summary class="adv-sum"><b>個別工作</b><span class="small muted">　沒指定就跟上面一樣</span></summary><div class="stack" style="margin-top:12px">' +
     others.map(t => {
       const m = a.models[t] || {}, same = !m.provider || (m.provider === d.provider && m.model === d.model);
-      const opts = [["", "跟上面一樣（" + (d.model || "未選") + "）"]].concat(Object.keys(S.models).flatMap(q => (S.models[q] || []).map(x => [q + "|" + x, P[q] + " · " + x])));
+      const opts = [["", "跟上面一樣（" + (d.model || "未選") + "）"]].concat(withKey.flatMap(q => (MODEL_PRESETS[q] || []).map(x => [q + "|" + x.id, P[q] + " · " + x.id, x.paid ? PAID : ""])));
       const cur = same ? "" : m.provider + "|" + m.model;
-      if (cur && !opts.some(o => o[0] === cur)) opts.push([cur, (P[m.provider] || m.provider) + " · " + m.model]);
+      if (cur && !opts.some(o => o[0] === cur)) opts.push([cur, (P[m.provider] || m.provider) + " · " + m.model, isPaid(m.provider, m.model) ? PAID : ""]);
       return '<div class="field"><label class="small" for="tk-' + t + '"><b>' + esc(a.tasks[t].label) + '</b>　<span class="muted" style="font-weight:400">' + esc(a.tasks[t].hint) + "</span></label>" + dd("tk-" + t, a.tasks[t].label, opts, cur) + "</div>";
     }).join("") + "</div></details></section>";
   return html;

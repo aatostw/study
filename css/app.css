@@ -237,6 +237,8 @@ textarea.input{resize:vertical;line-height:1.6}
 .dd-opt[aria-selected="true"]{background:var(--primary-soft);font-weight:600}
 .dd-opt .check{margin-left:auto;color:var(--primary-text);display:grid}
 .dd-btn.en,.dd-list.en .dd-opt{font-family:var(--font-en)}
+.paid-badge{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:#F5B301;color:#fff;font:700 11px/1 var(--font-en);vertical-align:-3px;flex:none}
+.dd-opt .paid-badge{margin-left:2px}
 .adv-sum{cursor:pointer;list-style:none;display:flex;align-items:baseline}
 .adv-sum::-webkit-details-marker{display:none}
 .adv-sum::before{content:"›";display:inline-block;margin-right:8px;color:var(--muted);transition:transform .15s}

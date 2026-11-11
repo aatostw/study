@@ -137,12 +137,7 @@ const ACT = {
   "pref-open": el => {
     S.prefPage = el.dataset.p; S.aiTest = null; S.dd = null; render.last = null; render(); $("#main").scrollTop = 0;
     if (el.dataset.p === "status") loadStatus().catch(() => {});
-    if (el.dataset.p === "ai" && S.settings){
-      const a = S.settings.ai;
-      Object.keys(a.keys).filter(p => a.keys[p] && !S.models[p]).forEach(p => aiLoadModels(p, true));
-      const d = aiDefault();
-      if (d.provider === "custom" && !S.models.custom) aiLoadModels("custom", true);
-    }
+    if (el.dataset.p === "ai") S.aiCustom = false;
   },
   "pref-back": () => { S.prefPage = null; render.last = null; render(); $("#main").scrollTop = 0; },
   "back": () => { closeSheet(); go(S.view); },
@@ -273,13 +268,14 @@ const ACT = {
     const id = el.dataset.dd, v = el.dataset.val;
     S.dd = null;
     if (id === "ai-prov"){
-      S.aiProv = v;
-      const a = S.settings.ai;
-      aiSetDefault(v, "");
-      if (a.keys[v] || v === "custom") aiLoadModels(v);
-      return;
+      S.aiProv = v; S.aiCustom = false;
+      return aiSetDefault(v, MODEL_DEFAULT[v] || "");
     }
-    if (id === "ai-model") return aiSetDefault(aiDefault().provider, v);
+    if (id === "ai-model"){
+      if (v === "__custom"){ S.aiCustom = true; render(); setTimeout(() => { const i = $("#ai-model-text"); if (i) i.focus(); }, 30); return; }
+      S.aiCustom = false;
+      return aiSetDefault(aiDefault().provider, v);
+    }
     if (id.startsWith("tk-")){
       const t = id.slice(3), d = aiDefault();
       const [prov, ...rest] = v ? v.split("|") : [d.provider, d.model];
@@ -288,7 +284,6 @@ const ACT = {
     render();
   },
   "key-eye": el => { const i = $("#" + el.dataset.for); if (i) i.type = i.type === "password" ? "text" : "password"; },
-  "m-reload": () => aiLoadModels(aiDefault().provider),
   "ai-test": () => {
     const d = aiDefault();
     S.aiTest = null;
@@ -339,7 +334,6 @@ document.addEventListener("change", async e => {
     const p = el.dataset.p;
     await aiSave({keys: {[p]: el.value.trim()}});
     toast("金鑰存好了");
-    aiLoadModels(p);
   }
   if (a === "ai-base") await aiSave({custom_base: el.value.trim()});
   if (a === "ai-model-text" && el.value.trim()) await aiSetDefault(aiDefault().provider || S.aiProv, el.value.trim());
