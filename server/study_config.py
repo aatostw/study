@@ -10,10 +10,10 @@ AI 金鑰和每項工作要用的模型，不用寫在這裡，到 App 的「設
 GPT_SOVITS_DIR = r"D:\GPT-SoVITS-v2pro-20250604"
 
 # 所有資料放在這裡：上傳的影音、轉好的音訊、PDF/EPUB、朗讀暫存
-DATA_DIR = r"D:\Study Natursai\data"
+DATA_DIR = r"D:\study-server\data"
 
 # 「電腦待處理資料夾」：用 OneDrive、隨身碟等方式放進來的檔案，App 裡可以直接匯入
-INBOX_DIR = r"D:\Study Natursai\待處理"
+INBOX_DIR = r"D:\study-server\待處理"
 
 # 資料庫（docker-compose.yml 會開一個 PostgreSQL + pgvector，連接埠 5433）
 DATABASE_URL = "postgresql://study:study-local-only@127.0.0.1:5433/study"
@@ -38,7 +38,7 @@ ASR_IDLE_UNLOAD_MIN = 10
 EMBED_MODEL = "BAAI/bge-m3"
 
 # 下載的 AI 模型（向量模型等）放這裡，不占 C 槽
-MODEL_DIR = r"D:\Study Natursai\models"
+MODEL_DIR = r"D:\study-server\models"
 
 # 單一檔案大小上限（GB）
 MAX_UPLOAD_GB = 8
