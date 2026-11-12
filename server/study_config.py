@@ -40,5 +40,12 @@ EMBED_MODEL = "BAAI/bge-m3"
 # 下載的 AI 模型（向量模型等）放這裡，不占 C 槽
 MODEL_DIR = r"D:\study-server\models"
 
+# 朗讀中文用的參考音檔（選填）
+# GPT-SoVITS 會模仿參考音檔的語氣和口音。英文樣本拿去唸中文會怪怪的，
+# 放一段 3～10 秒、同一個人用中文說的話，並把她說的內容一字不差寫在 REF_ZH_TEXT。
+# 沒放的話，中文也會用語音伺服器（voice_server.py）的英文樣本。
+REF_ZH_AUDIO = r"D:\study-server\ref_zh.wav"
+REF_ZH_TEXT = ""
+
 # 單一檔案大小上限（GB）
 MAX_UPLOAD_GB = 8

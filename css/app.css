@@ -134,7 +134,14 @@ textarea.input{resize:vertical;line-height:1.6}
 .list-row .chev{color:var(--muted);font-size:22px;flex:none}
 
 /* ---------- ask ---------- */
-.answer{font-size:16.5px;line-height:1.8;white-space:pre-wrap;word-break:break-word}
+.answer{font-size:16.5px;line-height:1.8;word-break:break-word}
+.rich p{margin:0 0 .7em}
+.rich p:last-child{margin-bottom:0}
+.rich ul,.rich ol{margin:0 0 .7em;padding-left:1.4em}
+.rich ul:last-child,.rich ol:last-child{margin-bottom:0}
+.rich li{margin:.25em 0;padding-left:.15em}
+.rich li::marker{color:var(--primary-text);font-weight:700}
+.rich .rich-h{font-weight:700;color:var(--primary-text);margin-top:.4em}
 .src{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:12px;background:var(--field);border:0;text-align:left;width:100%;color:inherit}
 .src .n{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font:700 12px var(--font-en);background:var(--line);color:var(--muted);flex:none}
 .src.cited .n{background:var(--yellow);color:#2B2520}

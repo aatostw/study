@@ -52,7 +52,7 @@ function answerHTML(r, ctx){
   const cited = (r.sources || []).filter(s => s.cited), rest = (r.sources || []).filter(s => !s.cited);
   return '<section class="card"><div class="row between top"><div class="label grow">' + esc(r.question) + '</div>' +
     (r.id && ctx === "ask" ? '<button class="icon-btn" data-act="ask-del" data-id="' + r.id + '" aria-label="刪除">' + ICON.trash + "</button>" : "") + "</div>" +
-    '<div class="answer">' + citeHTML(r.answer, ctx) + "</div>" +
+    '<div class="answer rich">' + richHTML(r.answer, ctx) + "</div>" +
     (r.model ? '<div class="tiny muted">' + esc(r.model) + "</div>" : "") +
     (cited.length ? '<div class="label">出處</div><div class="stack">' + cited.map(s => srcRow(s, ctx)).join("") + "</div>" : "") +
     (rest.length ? '<details><summary class="small muted" style="cursor:pointer">其他找到但沒用上的資料（' + rest.length + "）</summary>" +
@@ -136,7 +136,7 @@ function analysisHTML(a){
   if (a.summary) html += '<p style="margin:0;line-height:1.75">' + esc(a.summary) + "</p>";
   if ((a.themes || []).length) html += '<div class="stack">' + a.themes.map(t => '<div class="sec"><h3>' + esc(t.title) + '</h3><div class="small" style="line-height:1.7">' + esc(t.explain || "") + "</div></div>").join("") + "</div>";
   if ((a.connections || []).length){
-    html += '<div class="label">跟其他書和課程的關聯</div><div class="stack">' + a.connections.map(c => '<div class="pt"><span class="chip green" style="flex:none">' + esc(c.theme || "") + '</span><span>' + citeHTML(c.text, "analysis") + "</span></div>").join("") + "</div>";
+    html += '<div class="label">跟其他書和課程的關聯</div><div class="stack">' + a.connections.map(c => '<div class="pt"><span class="chip green" style="flex:none">' + esc(c.theme || "") + '</span><span class="rich">' + richHTML(c.text, "analysis") + "</span></div>").join("") + "</div>";
   }
   if ((a.questions || []).length) html += '<div class="label">值得再想的問題</div><ol style="margin:0;padding-left:22px;line-height:1.8">' + a.questions.map(q => "<li>" + esc(q) + "</li>").join("") + "</ol>";
   return html + "</section>";

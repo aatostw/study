@@ -155,5 +155,23 @@ const ICON = {
 function citeHTML(text, ctx){
   return esc(text).replace(/\[(\d{1,2})\]/g, (m, n) => '<button class="cite" data-act="src" data-ctx="' + ctx + '" data-n="' + n + '">' + n + "</button>");
 }
+/* AI 回答常用 Markdown（* 條列、1. 編號、**粗體**），轉成正常的條列；其他一律當純文字 */
+function richHTML(text, ctx){
+  const inline = x => citeHTML(x, ctx).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/__(.+?)__/g, "<b>$1</b>");
+  let out = "", list = null;
+  const close = () => { if (list){ out += "</" + list + ">"; list = null; } };
+  String(text || "").replace(/\r/g, "").split("\n").forEach(raw => {
+    const l = raw.trim();
+    let m;
+    if ((m = l.match(/^[*\-•・]\s+(.*)$/))){ if (list !== "ul"){ close(); out += "<ul>"; list = "ul"; } out += "<li>" + inline(m[1]) + "</li>"; return; }
+    if ((m = l.match(/^(\d+)[.)、]\s*(.+)$/))){ if (list !== "ol"){ close(); out += "<ol>"; list = "ol"; } out += "<li>" + inline(m[2]) + "</li>"; return; }
+    close();
+    if (!l) return;
+    if ((m = l.match(/^#{1,6}\s+(.*)$/))){ out += '<p class="rich-h">' + inline(m[1]) + "</p>"; return; }
+    out += "<p>" + inline(l) + "</p>";
+  });
+  close();
+  return out;
+}
 function timeBtn(t){ return t == null ? "" : '<button class="time" data-act="seek" data-t="' + t + '">' + fmtT(t) + "</button>"; }
 function progressBar(frac, blue){ return '<div class="progress' + (blue ? " blue" : "") + '"><span style="width:' + Math.round(Math.max(0.02, Math.min(1, frac || 0)) * 100) + '%"></span></div>'; }

@@ -86,7 +86,7 @@ def status():
     return {"ok": True, "gpu": engines.state["gpu"] or ("CUDA" if engines.gpu_ok() else "（沒有偵測到顯示卡）"),
             "asr": engines.state["asr"], "asr_error": engines.state["asr_error"], "asr_model": config.ASR_MODEL,
             "embed": engines.state["embed"], "embed_error": engines.state["embed_error"],
-            "tts": tts.status(), "ffmpeg": bool(engines.find_ffmpeg()), "fake": config.FAKE,
+            "tts": tts.status(), "tts_ref": tts.ref_info(), "ffmpeg": bool(engines.find_ffmpeg()), "fake": config.FAKE,
             "queue": q, "counts": n, "disk_free_gb": round(du.free / 1e9, 1), "inbox": config.INBOX_DIR}
 
 

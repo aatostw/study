@@ -36,7 +36,36 @@ def _voice_settings():
     ref = s["REF_AUDIO"]
     if not os.path.isabs(ref):
         ref = os.path.join(config.GPT_SOVITS_DIR or "", ref)
-    return ref, s["REF_TEXT"], s["REF_LANG"]
+    lang = s["REF_LANG"]
+    # 參考文字全是英文的話，就該用英文規則讀它（voice_server.py 寫成 zh 會讓樣本被讀歪）
+    if s["REF_TEXT"] and re.fullmatch(r"[\x00-\x7F]+", s["REF_TEXT"]):
+        lang = "en"
+    return ref, s["REF_TEXT"], lang
+
+
+def zh_ref():
+    """中文參考音檔：有放檔案、也有寫內容才用"""
+    p, t = config.REF_ZH_AUDIO, (config.REF_ZH_TEXT or "").strip()
+    if p and t and os.path.isfile(p):
+        return p, t, "zh"
+    return None
+
+
+def pick_ref(text, lang):
+    """唸中文（或中英混合、自動且有中文字）用中文樣本；其他用語音伺服器的樣本"""
+    if lang in ("zh", "auto") and re.search(r"[\u4e00-\u9fff]", text):
+        z = zh_ref()
+        if z:
+            return z
+    return _voice_settings()
+
+
+def ref_info():
+    """給設定頁看的"""
+    ref, text, lang = _voice_settings()
+    return {"en": {"file": os.path.basename(ref), "text": text, "lang": lang},
+            "zh": ({"file": os.path.basename(zh_ref()[0]), "text": zh_ref()[1]} if zh_ref() else None),
+            "zh_path": config.REF_ZH_AUDIO}
 
 
 def status():
@@ -53,7 +82,8 @@ def synth(text, lang="zh", speed=1.0):
     text = " ".join(text.split())
     lang = lang if lang in LANGS else "zh"
     speed = round(min(max(float(speed), 0.6), 1.6), 2)
-    h = hashlib.sha1(("%s|%s|%s" % (lang, speed, text)).encode("utf-8")).hexdigest()
+    ref, ref_text, ref_lang = pick_ref(text, lang)
+    h = hashlib.sha1(("%s|%s|%s|%s" % (lang, speed, os.path.basename(ref), text)).encode("utf-8")).hexdigest()
     path = os.path.join(config.TTS_DIR, h + ".wav")
     if os.path.isfile(path):
         with open(path, "rb") as f:
@@ -67,7 +97,6 @@ def synth(text, lang="zh", speed=1.0):
             w.writeframes(b"\x00\x00" * 8000)
         data = buf.getvalue()
     else:
-        ref, ref_text, ref_lang = _voice_settings()
         with _lock:
             try:
                 r = httpx.get(API + "/tts", timeout=300, params={

@@ -136,11 +136,21 @@ function voicePage(){
   const pr = (S.settings && S.settings.prefs) || {}, sp = Number(pr.tts_speed || 1);
   return '<section class="card pref-card"><h2 style="font-size:20px">朗讀</h2>' +
     '<div class="pref-row"><span><b>GPT-SoVITS</b><div class="small muted">你自己的聲音，電腦上的「啟動語音伺服器」要開著</div></span>' + (S.status ? stateChip(S.status.tts) : "") + "</div>" +
+    refHTML() +
     '<div class="pref-group"><div class="pref-h">預設語言</div><div class="seg">' + ["zh", "en", "auto"].map(v => '<button data-act="pref" data-k="tts_lang" data-v="' + v + '" aria-pressed="' + ((pr.tts_lang || "zh") === v) + '">' + TTS_LANG_LABEL[v] + "</button>").join("") + "</div></div>" +
     '<div class="pref-group"><div class="row between"><label class="pref-h" for="pref-speed">預設速度</label><span class="val-pill" id="pref-speed-v">' + sp.toFixed(1) + '×</span></div>' +
     '<input type="range" id="pref-speed" min="0.6" max="1.6" step="0.1" value="' + sp + '" data-act-change="pref-speed" style="accent-color:var(--primary)"></div>' +
     '<div class="pref-group"><div class="pref-h">試聽</div><button class="btn soft" data-act="voice-test"' + (S.busy.voiceTest ? " disabled" : "") + ">" + (S.busy.voiceTest ? '<span class="spinner"></span>' : ICON.speaker) + "唸一句聽聽看</button></div>" +
     (S.err.voiceTest ? '<div class="err">' + esc(S.err.voiceTest) + "</div>" : "") + "</section>";
+}
+
+function refHTML(){
+  const r = S.status && S.status.tts_ref;
+  if (!r) return "";
+  return '<div class="pref-group"><div class="pref-h">參考音檔（決定語氣和口音）</div>' +
+    '<div class="pref-row"><span class="small"><b>英文</b><div class="muted">' + esc(r.en.file) + "：" + esc(r.en.text) + "</div></span>" + stateChip("ready") + "</div>" +
+    '<div class="pref-row"><span class="small"><b>中文</b><div class="muted">' + (r.zh ? esc(r.zh.file) + "：" + esc(r.zh.text) : "還沒設定，中文也用英文樣本，口音會比較怪") + "</div></span>" + (r.zh ? stateChip("ready") : '<span class="chip yellow">未設定</span>') + "</div>" +
+    (r.zh ? "" : '<div class="small muted">放一段 3～10 秒的中文錄音到 <span class="en">' + esc(r.zh_path) + "</span>，再把說的內容一字不差填進電腦上 study_config.py 的 REF_ZH_TEXT，重開伺服器。</div>") + "</div>";
 }
 
 /* ---------- 課程 ---------- */
