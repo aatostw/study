@@ -131,3 +131,37 @@ ALTER TABLE notes ADD COLUMN IF NOT EXISTS starred boolean NOT NULL DEFAULT fals
 ALTER TABLE books ADD COLUMN IF NOT EXISTS starred boolean NOT NULL DEFAULT false;
 ALTER TABLE lectures ADD COLUMN IF NOT EXISTS starred boolean NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS notes_free ON notes(updated_at DESC) WHERE book_id IS NULL;
+
+-- 助理：對話（一串對話有很多則訊息；評估一本書也會變成對話裡的一張卡片）
+CREATE TABLE IF NOT EXISTS chats (
+  id bigserial PRIMARY KEY,
+  title text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS chat_msgs (
+  id bigserial PRIMARY KEY,
+  chat_id bigint NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+  role text NOT NULL,                        -- user / assistant
+  content text NOT NULL DEFAULT '',
+  scope text NOT NULL DEFAULT 'all',
+  sources jsonb NOT NULL DEFAULT '[]',
+  card jsonb,                                -- 例如 {"type":"eval","book_id":3}
+  model text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS chat_msgs_chat ON chat_msgs(chat_id, id);
+
+-- 把以前「問答」的紀錄搬進助理的對話（只做一次）
+DO $$
+DECLARE r record; cid bigint;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM settings WHERE k = 'chats_migrated') THEN
+    FOR r IN SELECT * FROM asks WHERE scope NOT LIKE 'book:%' AND scope NOT LIKE 'lecture:%' ORDER BY id LOOP
+      INSERT INTO chats (title, created_at, updated_at) VALUES (left(r.question, 40), r.created_at, r.created_at) RETURNING id INTO cid;
+      INSERT INTO chat_msgs (chat_id, role, content, scope, created_at) VALUES (cid, 'user', r.question, r.scope, r.created_at);
+      INSERT INTO chat_msgs (chat_id, role, content, scope, sources, model, created_at) VALUES (cid, 'assistant', r.answer, r.scope, r.sources, r.model, r.created_at);
+    END LOOP;
+    INSERT INTO settings (k, v) VALUES ('chats_migrated', 'true');
+  END IF;
+END $$;

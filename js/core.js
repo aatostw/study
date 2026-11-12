@@ -112,7 +112,7 @@ function render(){
   const key = S.view + "|" + (S.sub ? S.sub.type + S.sub.id : "") + "|" + (S.view === "lectures" ? S.lecTab : "") + "|" + (S.assist || "");
   const keep = render.last === key ? main.scrollTop : 0;
   const fn = S.sub ? ({book: renderBook, lecture: renderLecture, note: renderNote}[S.sub.type])
-    : ({ask: renderAsk, books: renderShelf, mybooks: renderMyBooks, notebook: renderNotebook, lectures: renderLectures, review: renderReview, prefs: renderPrefs}[S.view] || renderShelf);
+    : ({ask: renderAssist, books: renderShelf, mybooks: renderMyBooks, notebook: renderNotebook, lectures: renderLectures, review: renderReview, prefs: renderPrefs}[S.view] || renderShelf);
   const active = document.activeElement, activeId = active && active.id, sel = active && active.selectionStart;
   main.innerHTML = fn();
   main.scrollTop = keep;

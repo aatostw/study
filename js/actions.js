@@ -137,6 +137,7 @@ async function download(path, name, opt){
 const safeName = s => String(s || "export").replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60);
 
 function findSource(ctx, n){
+  if (/^m\d+$/.test(ctx || "")){ const m = S.chat && S.chat.messages.find(x => "m" + x.id === ctx); return ((m && m.sources) || []).find(s => String(s.n) === String(n)); }
   const list = ctx === "ask" ? S.ask.cur && S.ask.cur.sources : ctx === "book" ? S.ask.book && S.ask.book.sources
     : ctx === "lec" ? S.ask.lec && S.ask.lec.sources : ctx === "analysis" ? S.book && S.book.book.analysis && S.book.book.analysis.sources : null;
   return (list || []).find(s => String(s.n) === String(n));
@@ -160,7 +161,19 @@ const ACT = {
   "back": () => { closeSheet(); go(S.view); },
   "go": el => { closeSheet(); go(el.dataset.v); },
   "assist": el => { S.assist = el.dataset.v || null; render.last = null; render(); $("#main").scrollTop = 0; if (!S.books) loadBooks(); },
-  "ask-focus": () => { const q = $("#ask-q"); if (q){ q.focus(); q.scrollIntoView({block: "center"}); } },
+  "ask-focus": () => { const q = $("#chat-in"); if (q) q.focus(); },
+  "chat-send": () => chatSend(($("#chat-in") || {}).value),
+  "chat-example": el => chatSend(el.dataset.q),
+  "chat-new": () => { closeSheet(); S.chat = null; S.err.chat = ""; render(); const q = $("#chat-in"); if (q) q.focus(); },
+  "chat-history": () => { chatHistorySheet(); loadChats().then(() => { if (S.sheet) chatHistorySheet(); }).catch(() => {}); },
+  "chat-open": el => { closeSheet(); openChat(Number(el.dataset.id)).catch(e => toast(errMsg(e))); },
+  "chat-del": async el => {
+    if (!(await confirmBox("刪除這段對話？", "刪除後無法復原。", "刪除", true))) return;
+    const id = Number(el.dataset.id);
+    await api("/chats/" + id, {method: "DELETE"}).catch(e => toast(errMsg(e)));
+    if (S.chat && S.chat.id === id) S.chat = null;
+    await loadChats(); chatHistorySheet(); render();
+  },
 
   /* 書櫃 */
   "add-sheet": () => addSheet(),
@@ -212,14 +225,6 @@ const ACT = {
 
   /* 問答 */
   "ask-scope": el => { S.ask.scope = el.dataset.v; render(); },
-  "ask": () => {
-    const q = ($("#ask-q").value || "").trim();
-    if (!q) return toast("先輸入問題");
-    S.ask.draft = q;
-    act("ask", async () => { S.ask.cur = await api("/ask", {json: {question: q, scope: S.ask.scope}}); S.ask.draft = ""; loadAsks().catch(() => {}); });
-  },
-  "ask-open": el => { const x = (S.asks || []).find(a => String(a.id) === el.dataset.id); if (x){ S.ask.cur = x; render(); $("#main").scrollTop = 0; } },
-  "ask-del": el => act("askdel", async () => { await api("/asks/" + el.dataset.id, {method: "DELETE"}); S.ask.cur = null; await loadAsks(); }),
   "src": el => { const s = findSource(el.dataset.ctx, el.dataset.n); if (s) sourceSheet(s); },
 
   /* 書 */
@@ -401,6 +406,7 @@ document.addEventListener("click", e => {
 document.addEventListener("input", e => {
   const el = e.target, d = el.dataset && el.dataset.draft;
   if (d === "ask") S.ask.draft = el.value;
+  else if (d === "chat"){ S.chatDraft = el.value; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 160) + "px"; }
   else if (d === "bookq") S.ask.bookDraft = el.value;
   else if (d === "lecq") S.ask.lecDraft = el.value;
   else if (d === "tts") S.tts.text = el.value;
@@ -457,10 +463,16 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape" && S.dd){ S.dd = null; render(); return; }
   if (e.key === "Escape" && S.sheet) closeSheet();
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing && (e.target.id === "book-q")){ e.preventDefault(); ACT["ask-book"](); }
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing && e.target.id === "chat-in" && matchMedia("(hover: hover)").matches){ e.preventDefault(); ACT["chat-send"](); }
 });
 const AU = $("#au");
 ["timeupdate", "play", "pause", "loadedmetadata"].forEach(ev => AU.addEventListener(ev, () => playerTick()));
-function afterRender(){ playerTick(); }
+function afterRender(){
+  playerTick();
+  const ci = $("#chat-in");
+  if (ci && ci.value){ ci.style.height = "auto"; ci.style.height = Math.min(ci.scrollHeight, 160) + "px"; }
+  if (S.chatScroll && S.view === "ask" && !S.sub){ S.chatScroll = false; const m = $("#main"); m.scrollTop = m.scrollHeight; }
+}
 
 /* ---------- 網址 #books/book/3 ---------- */
 function fromHash(){

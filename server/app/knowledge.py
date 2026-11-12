@@ -135,20 +135,31 @@ ASK_SYSTEM = (
 )
 
 
-def ask(question, scope="all", k=10):
-    sources = search(question, scope, k)
+def answer(question, scope="all", k=10, history=None, search_text=None):
+    """找資料、請 AI 回答；history = [(問, 答), ...] 讓追問聽得懂前文"""
+    sources = search(search_text or question, scope, k)
     if not sources:
         return {"answer": "知識庫裡還沒有資料可以回答。先新增筆記或處理一堂課。", "sources": [], "model": ""}
     blocks = []
     for i, s in enumerate(sources, 1):
         blocks.append("[%d] %s\n%s" % (i, s["label"], s["text"]))
-    prompt = "資料：\n\n" + "\n\n".join(blocks) + "\n\n問題：" + question
-    answer, used = ai.generate("ask", prompt, system=ASK_SYSTEM, max_tokens=4096)
-    cited = {int(n) for n in re.findall(r"\[(\d{1,2})\]", answer)}
+    prompt = "資料：\n\n" + "\n\n".join(blocks)
+    if history:
+        prompt += "\n\n先前的對話（只用來理解問題在指什麼，引用編號以這次的資料為準）：\n" + "\n".join(
+            "使用者：%s\n助理：%s" % (q, re.sub(r"\[\d{1,2}\]", "", a)[:600]) for q, a in history)
+    prompt += "\n\n問題：" + question
+    text, used = ai.generate("ask", prompt, system=ASK_SYSTEM, max_tokens=4096)
+    cited = {int(n) for n in re.findall(r"\[(\d{1,2})\]", text)}
     for i, s in enumerate(sources, 1):
         s["n"] = i
         s["cited"] = i in cited
+    return {"answer": text, "sources": sources, "model": used}
+
+
+def ask(question, scope="all", k=10):
+    r = answer(question, scope, k)
+    if not r["sources"]:
+        return r
     row = db.one("INSERT INTO asks (question, scope, answer, sources, model) VALUES (%s, %s, %s, %s, %s) RETURNING id, created_at",
-                 (question, scope, answer, Jsonb(sources), used))
-    return {"id": row["id"], "question": question, "scope": scope, "answer": answer, "sources": sources,
-            "model": used, "created_at": row["created_at"].isoformat()}
+                 (question, scope, r["answer"], Jsonb(r["sources"]), r["model"]))
+    return dict(r, id=row["id"], question=question, scope=scope, created_at=row["created_at"].isoformat())

@@ -11,7 +11,7 @@ import time
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response, StreamingResponse
 
-from . import ai, bookeval, config, db, engines, jobs, knowledge, tts, websearch
+from . import ai, bookeval, chat, config, db, engines, jobs, knowledge, tts, websearch
 from .textutil import fmt_t, tts_parts
 
 app = FastAPI(title="study-server", docs_url=None, redoc_url=None, openapi_url=None)
@@ -702,6 +702,39 @@ def asks(limit: int = 20):
 @app.delete("/asks/{aid}")
 def ask_del(aid: int):
     db.run("DELETE FROM asks WHERE id = %s", (aid,))
+    return {"ok": True}
+
+
+# ---------- 助理對話 ----------
+
+@app.get("/chats")
+def chats_list(limit: int = 30):
+    return {"ok": True, "chats": chat.recent(min(max(limit, 1), 100))}
+
+
+@app.get("/chats/{cid}")
+def chat_get(cid: int):
+    r = chat.get(cid)
+    if not r:
+        raise Bad("找不到這段對話", 404)
+    return dict(r, ok=True)
+
+
+@app.post("/chat")
+async def chat_send(request: Request):
+    b = await body_json(request)
+    text = s(b.get("message"), 4000)
+    if not text:
+        raise Bad("請輸入訊息")
+    try:
+        return dict(chat.send(int(b.get("chat_id") or 0) or None, text, s(b.get("scope"), 40) or "all"), ok=True)
+    except ValueError as e:
+        raise Bad(str(e), 404)
+
+
+@app.delete("/chats/{cid}")
+def chat_del(cid: int):
+    db.run("DELETE FROM chats WHERE id = %s", (cid,))
     return {"ok": True}
 
 

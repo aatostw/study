@@ -10,7 +10,7 @@ async function load(){
     if (!S.settings) loadSettings().catch(() => {});        // 朗讀要用到語言和速度
     if (S.sub && S.sub.type === "lecture") return await loadLecture();
     if (S.sub && S.sub.type === "note") return await loadNote();
-    if (S.view === "ask"){ loadBooks(true).then(renderSoon).catch(() => {}); return await loadAsks(); }
+    if (S.view === "ask"){ loadBooks(true).then(renderSoon).catch(() => {}); return await loadChats(); }
     if (S.view === "books") return await loadShelf();
     if (S.view === "mybooks") return await loadBooks();
     if (S.view === "notebook") return await loadNotebook();
@@ -36,24 +36,6 @@ function loading(){ return loadErr() || '<div class="card flat"><div class="row"
 function scopeSeg(cur, act){
   const opts = [["all", "全部"], ["books", "書和筆記"], ["lectures", "課程"]];
   return '<div class="seg" role="group" aria-label="範圍">' + opts.map(o => '<button data-act="' + act + '" data-v="' + o[0] + '" aria-pressed="' + (cur === o[0]) + '">' + o[1] + "</button>").join("") + "</div>";
-}
-function renderAsk(){
-  if (S.assist === "wish") return renderWishList();
-  const a = S.ask, nWish = (S.books || []).filter(b => b.shelf === "wish").length;
-  let html = '<div class="chips"><button class="chip-btn" data-act="ask-focus">💬 問我的筆記</button><button class="chip-btn" data-act="wish-new">📖 評估一本書</button>' +
-    '<button class="chip-btn" data-act="assist" data-v="wish">📚 想讀清單' + (nWish ? "（" + nWish + "）" : "") + "</button></div>" +
-    '<section class="card"><div class="label">問你讀過的書、上過的課</div>' +
-    '<textarea class="input" id="ask-q" rows="3" placeholder="例如：老子和莊子對「無為」的看法有什麼不同？" data-draft="ask">' + esc(a.draft) + "</textarea>" +
-    scopeSeg(a.scope, "ask-scope") +
-    '<button class="btn block" data-act="ask"' + (a.busy ? " disabled" : "") + ">" + (a.busy ? '<span class="spinner"></span>正在翻你的筆記…' : "問問看") + "</button>" +
-    (S.err.ask ? '<div class="err">' + esc(S.err.ask) + "</div>" : "") + "</section>";
-  if (a.cur) html += answerHTML(a.cur, "ask");
-  html += '<section class="card"><div class="label">最近問過</div>';
-  if (!S.asks) html += S.err.load ? loadErr() : '<div class="row muted"><span class="spinner"></span>載入中…</div>';
-  else if (!S.asks.length) html += '<div class="empty">還沒問過問題。先到「書櫃」記筆記，或到「課程」上傳一堂課，再回來問。</div>';
-  else html += '<div class="stack">' + S.asks.map(x =>
-    '<button class="list-row" data-act="ask-open" data-id="' + x.id + '"><span class="t"><b>' + esc(x.question) + '</b><span class="sub">' + fmtDate(x.created_at) + " · " + ({all: "全部", books: "書和筆記", lectures: "課程"}[x.scope] || "指定範圍") + '</span></span><span class="chev">›</span></button>').join("") + "</div>";
-  return html + "</section>";
 }
 function answerHTML(r, ctx){
   const cited = (r.sources || []).filter(s => s.cited), rest = (r.sources || []).filter(s => !s.cited);
