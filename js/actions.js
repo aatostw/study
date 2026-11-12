@@ -46,7 +46,7 @@ async function pollJobs(now){
     for (const j of S.jobs){
       if ((j.status === "done" || j.status === "error") && before.get(j.id) && before.get(j.id) !== j.status){
         changed = true;
-        if (j.status === "done") toast({lecture: "課程處理好了：", resummarize: "重新摘要好了：", bookfile: "原文讀好了：", analyze: "分析好了："}[j.kind] + j.title);
+        if (j.status === "done") toast({lecture: "課程處理好了：", resummarize: "重新摘要好了：", bookfile: "原文讀好了：", analyze: "分析好了：", evaluate: "完成："}[j.kind] + j.title);
       }
     }
     if (changed){
@@ -203,6 +203,27 @@ const ACT = {
     if (!(await confirmBox("刪除這本書？", "書、所有筆記、上傳的原文和分析都會刪除，無法復原。", "刪除", true))) return;
     act("bookd", async () => { await api("/books/" + S.sub.id, {method: "DELETE"}); closeSheet(); S.books = null; go("books"); });
   },
+  /* 想讀 */
+  "shelf": el => { S.shelf = el.dataset.v; render(); },
+  "wish-new": () => wishSheet({}),
+  "wish-create": () => {
+    const body = {shelf: "wish", title: $("#w-title").value.trim(), author: $("#w-author").value.trim(), isbn: $("#w-isbn").value.trim(), wish_note: $("#w-note").value.trim()};
+    if (!body.title && !body.isbn) return toast("請填書名或 ISBN");
+    act("wishc", async () => { const r = await api("/books", {json: body}); closeSheet(); S.books = null; S.shelf = "wish"; pollJobs(true); go("books", {type: "book", id: r.book.id}); });
+  },
+  "pick-cover": () => { $("#pick-cover").value = ""; $("#pick-cover").click(); },
+  "evaluate": el => act("evaluate", async () => { await api("/books/" + el.dataset.id + "/evaluate", {method: "POST"}); toast("開始評估，大約 1～3 分鐘"); pollJobs(true); await loadBook(); }),
+  "evid-open": () => evidenceSheet(S.book.book),
+  "pick-evid": () => { $("#pick-evid").value = ""; $("#pick-evid").click(); },
+  "evid-save": el => act("evid", async () => {
+    const bid = S.sub.id;
+    await api("/books/" + bid + "/evidence", {json: {text: $("#evid-text").value, replace: true}});
+    closeSheet();
+    if (el.dataset.eval){ await api("/books/" + bid + "/evaluate", {method: "POST"}); toast("存好了，重新評估中"); pollJobs(true); } else toast("存好了");
+    await loadBook();
+  }),
+  "esrc": el => evalSourceSheet(el.dataset.n),
+  "wish-to-read": () => act("books", async () => { await api("/books/" + S.sub.id, {method: "PATCH", json: {shelf: "read"}}); S.books = null; S.shelf = "read"; toast("移到我的書了，開始記筆記吧"); await loadBook(); }),
   "pick-book": el => { S.bookTarget = el.dataset.id ? Number(el.dataset.id) : 0; $("#pick-book").value = ""; $("#pick-book").click(); },
   "pick-photo": () => { $("#pick-photo").value = ""; $("#pick-photo").click(); },
   "note-new": () => noteSheet({}),
@@ -370,6 +391,26 @@ document.addEventListener("change", async e => {
     const f = el.files[0];
     Up.start(f, "book", S.bookTarget ? {book_id: S.bookTarget} : {title: f.name.replace(/\.[^.]+$/, "")});
     if (!S.sub && S.view !== "books") go("books");
+  }
+  if (el.id === "pick-cover" && el.files[0]){
+    const keep = {title: $("#w-title").value, author: $("#w-author").value, isbn: $("#w-isbn").value, wish_note: $("#w-note").value};
+    S.busy.identify = true; wishSheet(keep);
+    try {
+      const r = await identifyCover(el.files[0]);
+      S.busy.identify = false;
+      wishSheet({title: r.title || keep.title, author: r.author || keep.author, isbn: r.isbn || keep.isbn, wish_note: keep.wish_note});
+      toast(r.title ? "認出來了，確認一下" : "沒認出書名，請手動輸入");
+    } catch (err) { S.busy.identify = false; wishSheet(keep); toast(errMsg(err)); }
+  }
+  if (el.id === "pick-evid" && el.files[0]){
+    const box = $("#evid-text"), prev = box ? box.value : "";
+    S.busy.evid = true; evidenceSheet({user_evidence: prev});
+    try {
+      const r = await api("/ocr", {method: "POST", body: await shrinkImage(el.files[0]), headers: {"Content-Type": "image/jpeg"}});
+      S.busy.evid = false;
+      evidenceSheet({user_evidence: (prev ? prev + "\n\n" : "") + (r.text || "")});
+      toast("辨識好了，可以再加一張");
+    } catch (err) { S.busy.evid = false; evidenceSheet({user_evidence: prev}); toast(errMsg(err)); }
   }
   if (el.id === "pick-photo" && el.files[0]){
     const f = el.files[0];

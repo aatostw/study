@@ -293,3 +293,14 @@ h1,h2{color:var(--primary-text)}
 @media (min-width:640px) and (max-width:767px){
   .app{border-left:1px solid var(--line);border-right:1px solid var(--line)}
 }
+
+/* ---------- 選書評估 ---------- */
+.pt .kind{flex:none;font-size:12px;font-weight:700;color:var(--muted);background:var(--field);border-radius:6px;padding:2px 7px;margin-top:3px}
+.ev-list{margin:0;padding-left:20px;display:grid;gap:6px;font-size:15px;line-height:1.65}
+.ev-list.pro li::marker{content:"＋ ";color:var(--green-text)}
+.ev-list.con li::marker{content:"－ ";color:var(--danger)}
+.card.verdict{border-left:6px solid var(--yellow)}
+.card.verdict.green{border-left-color:var(--green)}
+.card.verdict.red{border-left-color:var(--danger)}
+.cite.k{background:var(--primary-soft);color:var(--primary-text)}
+.cite.u{background:var(--green-soft);color:var(--green-text)}

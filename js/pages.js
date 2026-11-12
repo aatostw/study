@@ -74,12 +74,15 @@ function sourceSheet(s){
 
 /* ---------- 書櫃 ---------- */
 function renderBooks(){
-  let html = '<div class="row"><button class="btn grow" data-act="book-new">' + ICON.plus + "新增一本書</button>" +
+  if (S.shelf === "wish") return renderWishList();
+  let html = shelfSeg() + '<div class="row"><button class="btn grow" data-act="book-new">' + ICON.plus + "新增一本書</button>" +
     '<button class="btn soft" data-act="pick-book" data-id="">' + ICON.upload + "上傳 PDF／EPUB</button></div>" + uploadsHTML("book");
   if (!S.books) return html + loading();
-  if (!S.books.length) return html + '<section class="card"><div class="empty">書櫃還是空的。<br>新增一本書開始記筆記，或直接上傳 PDF／EPUB，原文也會進知識庫。</div></section>';
+  const all = S.books;
+  const mine = all.filter(b => (b.shelf || "read") === "read");
+  if (!mine.length) return html + '<section class="card"><div class="empty">書櫃還是空的。<br>新增一本書開始記筆記，或直接上傳 PDF／EPUB，原文也會進知識庫。</div></section>';
   const cols = ["", "green", "yellow"];
-  html += '<section class="card"><div class="label">我的書（' + S.books.length + "）</div><div class=\"stack\">" + S.books.map((b, i) => {
+  html += '<section class="card"><div class="label">我的書（' + mine.length + "）</div><div class=\"stack\">" + mine.map((b, i) => {
     const bits = [b.notes + " 則筆記"];
     if (b.file_name) bits.push(b.status === "ready" ? (b.pages ? "原文 " + b.pages + (b.file_name.toLowerCase().endsWith(".epub") ? " 章" : " 頁") : "原文") : b.status === "error" ? "原文讀取失敗" : "原文處理中");
     if (b.analyzed) bits.push("已分析");
@@ -90,7 +93,7 @@ function renderBooks(){
 
 function jobCard(job){
   if (!job || job.status === "done") return "";
-  const name = {bookfile: "讀取原文", analyze: "AI 分析", lecture: "處理課程", resummarize: "重新摘要"}[job.kind] || "處理中";
+  const name = {bookfile: "讀取原文", analyze: "AI 分析", lecture: "處理課程", resummarize: "重新摘要", evaluate: "選書評估"}[job.kind] || "處理中";
   if (job.status === "error") return '<div class="err">' + name + "失敗：" + esc(job.error) + '</div><button class="btn soft sm" data-act="job-retry" data-id="' + job.id + '">再試一次</button>';
   return '<div class="up"><div class="row between"><b class="small">' + name + '</b><span class="tiny muted">' + (job.status === "queued" ? "排隊中" : Math.round(job.progress * 100) + "%") + "</span></div>" +
     progressBar(job.progress) + '<div class="small muted">' + esc(job.step || "等前面的工作做完") + "</div></div>";
@@ -99,6 +102,7 @@ function jobCard(job){
 function renderBook(){
   const back = '<button class="btn ghost back" data-act="back">' + ICON.back + "書櫃</button>";
   if (!S.book || S.book.book.id !== S.sub.id) return back + loading();
+  if (S.book.book.shelf === "wish") return renderWishBook();
   const {book: b, notes, job} = S.book;
   const live = (S.jobs || []).find(j => j.ref_id === b.id && (j.kind === "bookfile" || j.kind === "analyze") && j.status !== "done") || job;
   let html = back + '<section class="card hero"><div class="label">書</div><h1>' + esc(b.title) + "</h1>" +

@@ -11,7 +11,7 @@ import time
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response, StreamingResponse
 
-from . import ai, config, db, engines, jobs, knowledge, tts
+from . import ai, bookeval, config, db, engines, jobs, knowledge, tts, websearch
 from .textutil import fmt_t, tts_parts
 
 app = FastAPI(title="study-server", docs_url=None, redoc_url=None, openapi_url=None)
@@ -86,7 +86,7 @@ def status():
     return {"ok": True, "gpu": engines.state["gpu"] or ("CUDA" if engines.gpu_ok() else "（沒有偵測到顯示卡）"),
             "asr": engines.state["asr"], "asr_error": engines.state["asr_error"], "asr_model": config.ASR_MODEL,
             "embed": engines.state["embed"], "embed_error": engines.state["embed_error"],
-            "tts": tts.status(), "tts_ref": tts.ref_info(), "ffmpeg": bool(engines.find_ffmpeg()), "fake": config.FAKE,
+            "tts": tts.status(), "tts_ref": tts.ref_info(), "search": websearch.status(), "ffmpeg": bool(engines.find_ffmpeg()), "fake": config.FAKE,
             "queue": q, "counts": n, "disk_free_gb": round(du.free / 1e9, 1), "inbox": config.INBOX_DIR}
 
 
@@ -130,8 +130,11 @@ async def ai_test(request: Request):
 
 @app.get("/books")
 def books():
-    rows = db.all("SELECT b.id, b.title, b.author, b.file_name, b.pages, b.status, b.updated_at, b.analysis IS NOT NULL AS analyzed, "
-                  "(SELECT count(*) FROM notes n WHERE n.book_id = b.id) AS notes "
+    rows = db.all("SELECT b.id, b.title, b.author, b.file_name, b.pages, b.status, b.updated_at, b.shelf, b.isbn, "
+                  "b.analysis IS NOT NULL AS analyzed, b.evaluation->'credibility'->>'light' AS light, "
+                  "b.evaluation->'verdict'->>'level' AS verdict, b.evaluation->'reception'->>'headline' AS headline, "
+                  "(SELECT count(*) FROM notes n WHERE n.book_id = b.id) AS notes, "
+                  "(SELECT status FROM jobs j WHERE j.ref_id = b.id AND j.kind = 'evaluate' ORDER BY j.id DESC LIMIT 1) AS eval_status "
                   "FROM books b ORDER BY b.updated_at DESC")
     return {"ok": True, "books": rows}
 
@@ -139,11 +142,47 @@ def books():
 @app.post("/books")
 async def book_add(request: Request):
     b = await body_json(request)
-    title = s(b.get("title"), 200)
+    title, author, isbn = s(b.get("title"), 200), s(b.get("author"), 200), re.sub(r"[^0-9Xx]", "", s(b.get("isbn"), 20))
+    if not title and isbn:
+        info = bookeval.lookup_isbn(isbn) or {}
+        title, author = info.get("title") or "", author or info.get("author") or ""
     if not title:
-        raise Bad("請填書名")
-    r = db.one("INSERT INTO books (title, author) VALUES (%s, %s) RETURNING *", (title, s(b.get("author"), 200)))
-    return {"ok": True, "book": r}
+        raise Bad("請填書名" + ("（這個 ISBN 查不到書名）" if isbn else ""))
+    shelf = "wish" if b.get("shelf") == "wish" else "read"
+    r = db.one("INSERT INTO books (title, author, isbn, shelf, wish_note) VALUES (%s, %s, %s, %s, %s) RETURNING *",
+               (title, author, isbn, shelf, s(b.get("wish_note"), 1000)))
+    out = {"ok": True, "book": r}
+    if shelf == "wish" and b.get("evaluate", True):
+        out["job"] = jobs.add("evaluate", r["id"], "評估《%s》" % title)
+    return out
+
+
+@app.get("/lookup")
+def lookup(isbn: str):
+    info = bookeval.lookup_isbn(isbn)
+    if not info:
+        raise Bad("ISBN 格式不對（10 或 13 碼）")
+    return {"ok": True, "book": info}
+
+
+IDENTIFY_PROMPT = ("這是一本書的照片（封面、書背或條碼）。辨識出書的資訊，只輸出 JSON："
+                   '{"isbn": "條碼或版權頁上的 ISBN，只要數字，看不到就空字串", "title": "書名", "author": "作者"}。看不清楚的欄位留空字串，不要猜。')
+
+
+@app.post("/identify")
+async def identify(request: Request):
+    data = await request.body()
+    mt = request.headers.get("content-type", "image/jpeg").split(";")[0]
+    if not mt.startswith("image/") or not data or len(data) > 15 * 1024 * 1024:
+        raise Bad("請上傳照片")
+    d, used = ai.generate_json("ocr", IDENTIFY_PROMPT, images=[(mt, data)], max_tokens=500)
+    isbn = re.sub(r"[^0-9Xx]", "", str(d.get("isbn") or ""))
+    out = {"isbn": isbn, "title": str(d.get("title") or "").strip(), "author": str(d.get("author") or "").strip()}
+    if isbn and (not out["title"] or not out["author"]):
+        info = bookeval.lookup_isbn(isbn) or {}
+        out["title"] = out["title"] or info.get("title", "")
+        out["author"] = out["author"] or info.get("author", "")
+    return {"ok": True, "book": out, "model": used}
 
 
 def _book(bid):
@@ -159,7 +198,7 @@ def book_get(bid: int):
     b.pop("file_path", None)
     notes = db.all("SELECT n.*, EXISTS (SELECT 1 FROM chunks c WHERE c.note_id = n.id) AS indexed "
                    "FROM notes n WHERE book_id = %s ORDER BY n.created_at DESC", (bid,))
-    job = db.one("SELECT id, kind, status, step, progress, error FROM jobs WHERE ref_id = %s AND kind IN ('bookfile', 'analyze') "
+    job = db.one("SELECT id, kind, status, step, progress, error FROM jobs WHERE ref_id = %s AND kind IN ('bookfile', 'analyze', 'evaluate') "
                  "ORDER BY id DESC LIMIT 1", (bid,))
     return {"ok": True, "book": b, "notes": notes, "job": job}
 
@@ -168,9 +207,30 @@ def book_get(bid: int):
 async def book_edit(bid: int, request: Request):
     _book(bid)
     b = await body_json(request)
-    db.run("UPDATE books SET title = COALESCE(NULLIF(%s, ''), title), author = %s, updated_at = now() WHERE id = %s",
-           (s(b.get("title"), 200), s(b.get("author"), 200), bid))
+    cur = _book(bid)
+    shelf = b.get("shelf") if b.get("shelf") in ("read", "wish") else cur["shelf"]
+    db.run("UPDATE books SET title = COALESCE(NULLIF(%s, ''), title), author = %s, isbn = %s, wish_note = %s, shelf = %s, updated_at = now() WHERE id = %s",
+           (s(b.get("title"), 200), s(b.get("author", cur["author"]), 200), re.sub(r"[^0-9Xx]", "", s(b.get("isbn", cur["isbn"]), 20)),
+            s(b.get("wish_note", cur["wish_note"]), 1000), shelf, bid))
     return {"ok": True}
+
+
+@app.post("/books/{bid}/evaluate")
+def book_evaluate(bid: int):
+    b = _book(bid)
+    j = jobs.add("evaluate", bid, "評估《%s》" % b["title"])
+    return {"ok": True, "job": j}
+
+
+@app.post("/books/{bid}/evidence")
+async def book_evidence(bid: int, request: Request):
+    """自己補的資料（例如微信讀書截圖辨識出來的點評），評估時一起看"""
+    b = _book(bid)
+    body = await body_json(request)
+    text = s(body.get("text"), 8000)
+    new = text if body.get("replace") else (b["user_evidence"] + ("\n\n" if b["user_evidence"] and text else "") + text)
+    db.run("UPDATE books SET user_evidence = %s, updated_at = now() WHERE id = %s", (new[-20000:], bid))
+    return {"ok": True, "user_evidence": new[-20000:]}
 
 
 @app.delete("/books/{bid}")

@@ -107,3 +107,19 @@ CREATE TABLE IF NOT EXISTS asks (
   model text NOT NULL DEFAULT '',
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- ===== 選書評估（想讀的書）=====
+ALTER TABLE books ADD COLUMN IF NOT EXISTS shelf text NOT NULL DEFAULT 'read';   -- read（我的書）/ wish（想讀）
+ALTER TABLE books ADD COLUMN IF NOT EXISTS isbn text NOT NULL DEFAULT '';
+ALTER TABLE books ADD COLUMN IF NOT EXISTS wish_note text NOT NULL DEFAULT '';   -- 為什麼想讀
+ALTER TABLE books ADD COLUMN IF NOT EXISTS user_evidence text NOT NULL DEFAULT ''; -- 自己補的資料（例如微信讀書截圖辨識的文字）
+ALTER TABLE books ADD COLUMN IF NOT EXISTS evaluation jsonb;
+
+-- 抓過的網頁（存 7 天，同一個網頁不重複抓）
+CREATE TABLE IF NOT EXISTS web_cache (
+  url text PRIMARY KEY,
+  ok boolean NOT NULL,
+  text text NOT NULL DEFAULT '',
+  why text NOT NULL DEFAULT '',
+  fetched_at timestamptz NOT NULL DEFAULT now()
+);

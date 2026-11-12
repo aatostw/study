@@ -1,4 +1,4 @@
-# 學習筆記的資料庫：PostgreSQL 17 + pgvector
+# 學習筆記：資料庫（PostgreSQL 17 + pgvector）和自架搜尋（SearXNG）
 # 雙擊「安裝資料庫.bat」會用這個檔案建立，之後 Docker Desktop 開機就會自動跑起來。
 services:
   db:
@@ -13,5 +13,15 @@ services:
       - "127.0.0.1:5433:5432"     # 只有這台電腦連得到
     volumes:
       - study-pgdata:/var/lib/postgresql/data
+  search:
+    image: searxng/searxng:latest
+    container_name: study-search
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8890:8080"     # 只有這台電腦連得到
+    volumes:
+      - ./searxng:/etc/searxng
+    environment:
+      SEARXNG_BASE_URL: "http://127.0.0.1:8890/"
 volumes:
   study-pgdata:

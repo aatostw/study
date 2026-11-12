@@ -1,0 +1,143 @@
+"use strict";
+/* =========================================================
+   想讀：選書評估。給書名／作者／ISBN（或拍封面、條碼），
+   電腦上網找評價和作者資料，AI 寫成評估卡：
+   可信度燈號（防唬爛）＋讀者心得＋適不適合你＋結論
+   ========================================================= */
+const LIGHT = {green: ["可信", "green", "🟢"], yellow: ["留意", "yellow", "🟡"], red: ["警訊", "red", "🔴"], unknown: ["資料不足", "", "⚪"]};
+const VERDICT = {read: ["值得讀", "green"], skim: ["挑章節讀", "yellow"], skip: ["可以跳過", "red"]};
+
+function shelfSeg(){
+  const n = s => (S.books || []).filter(b => (b.shelf || "read") === s).length;
+  return '<div class="seg" role="group" aria-label="書櫃">' + [["read", "我的書"], ["wish", "想讀"]].map(o =>
+    '<button data-act="shelf" data-v="' + o[0] + '" aria-pressed="' + ((S.shelf || "read") === o[0]) + '">' + o[1] + (S.books ? "（" + n(o[0]) + "）" : "") + "</button>").join("") + "</div>";
+}
+
+function renderWishList(){
+  let html = shelfSeg() + '<button class="btn block" data-act="wish-new">' + ICON.plus + "加入想讀，自動評估</button>";
+  if (!S.books) return html + loading();
+  const list = S.books.filter(b => b.shelf === "wish");
+  if (!list.length) return html + '<section class="card"><div class="empty">還沒有想讀的書。<br>輸入書名，或拍封面、條碼，電腦會上網找評價和作者背景，幫你判斷值不值得讀。</div></section>';
+  return html + '<section class="card"><div class="stack">' + list.map(b => {
+    const busy = b.eval_status === "queued" || b.eval_status === "running";
+    const L = LIGHT[b.light] || null, V = VERDICT[b.verdict] || null;
+    const sub = busy ? "評估中…" : b.eval_status === "error" ? "評估失敗，點進去重試" : (b.headline || (V ? "" : "還沒評估"));
+    return '<button class="list-row" data-act="open-book" data-id="' + b.id + '"><span class="ic yellow">' + (busy ? '<span class="spinner" style="width:18px;height:18px"></span>' : L ? L[2] : esc((b.title || "?").slice(0, 1))) + "</span>" +
+      '<span class="t"><b>' + esc(b.title) + '</b><span class="sub">' + esc((b.author ? b.author + " · " : "") + sub) + "</span></span>" +
+      (V && !busy ? '<span class="chip ' + V[1] + '">' + V[0] + "</span>" : '<span class="chev">›</span>') + "</button>";
+  }).join("") + "</div></section>";
+}
+
+function wishSheet(pre){
+  pre = pre || {};
+  openSheet('<h2>加入想讀</h2><div class="small muted">填書名就好，作者和 ISBN 有的話更準。也可以拍封面或書背的條碼。</div>' +
+    '<button class="btn soft block" data-act="pick-cover">' + (S.busy.identify ? '<span class="spinner"></span>辨識中…' : ICON.camera + "拍封面或條碼") + "</button>" +
+    '<div class="field"><label for="w-title">書名</label><input class="input" id="w-title" value="' + esc(pre.title || "") + '" placeholder="被討厭的勇氣"></div>' +
+    '<div class="row"><div class="field grow"><label for="w-author">作者</label><input class="input" id="w-author" value="' + esc(pre.author || "") + '"></div>' +
+    '<div class="field" style="width:44%"><label for="w-isbn">ISBN（選填）</label><input class="input en" id="w-isbn" inputmode="numeric" value="' + esc(pre.isbn || "") + '"></div></div>' +
+    '<div class="field"><label for="w-note">為什麼想讀（選填，評估「適不適合你」會參考）</label><textarea class="input" id="w-note" rows="2" placeholder="朋友推薦／想了解某個主題">' + esc(pre.wish_note || "") + "</textarea></div>" +
+    '<button class="btn block" data-act="wish-create">加入並開始評估</button>');
+}
+
+function evidenceSheet(b){
+  openSheet('<h2>補充資料</h2><div class="small muted">微信讀書的點評、朋友的心得，網路上找不到的都可以貼在這裡，評估時會一起看。</div>' +
+    '<button class="btn soft block" data-act="pick-evid">' + (S.busy.evid ? '<span class="spinner"></span>辨識中…' : ICON.camera + "拍或選截圖（自動辨識文字）") + "</button>" +
+    '<textarea class="input" id="evid-text" rows="9" placeholder="貼上文字，或用上面的按鈕從截圖辨識">' + esc(b.user_evidence || "") + "</textarea>" +
+    '<div class="row"><button class="btn soft grow" data-act="evid-save">只儲存</button><button class="btn grow" data-act="evid-save" data-eval="1">儲存並重新評估</button></div>');
+}
+
+/* 評估卡裡的 [3]、[K2]、[U] 變成可以點的小標籤 */
+function evalCite(text){
+  return esc(text || "").replace(/\[(\d{1,2}|K\d{1,2}|U)\]/g, (m, n) => '<button class="cite' + (n[0] === "K" ? " k" : n === "U" ? " u" : "") + '" data-act="esrc" data-n="' + n + '">' + n + "</button>");
+}
+function evalItem(x){ return evalCite(x.text) + (x.src ? " " + evalCite(x.src) : ""); }
+
+function renderWishBook(){
+  const back = '<button class="btn ghost back" data-act="back">' + ICON.back + "想讀</button>";
+  const {book: b, job} = S.book;
+  const live = (S.jobs || []).find(j => j.ref_id === b.id && j.kind === "evaluate" && j.status !== "done") || (job && job.kind === "evaluate" ? job : null);
+  const ev = b.evaluation;
+  let html = back + '<section class="card hero"><div class="label">想讀</div><h1>' + esc(b.title) + "</h1>" +
+    (b.author ? '<div class="sub">' + esc(b.author) + "</div>" : "") +
+    '<div class="row wrap">' + (b.isbn ? '<span class="chip en">ISBN ' + esc(b.isbn) + "</span>" : "") +
+    (ev && ev.book && ev.book.publisher ? '<span class="chip">' + esc(ev.book.publisher + (ev.book.year ? " · " + ev.book.year : "")) + "</span>" : "") + "</div>" +
+    (b.wish_note ? '<div class="sub small">想讀的原因：' + esc(b.wish_note) + "</div>" : "") + "</section>";
+  html += '<div class="row wrap"><button class="btn grow" data-act="evaluate" data-id="' + b.id + '"' + (live && (live.status === "queued" || live.status === "running") ? " disabled" : "") + ">" + ICON.spark + (ev ? "重新評估" : "開始評估") + "</button>" +
+    '<button class="btn soft" data-act="evid-open">補充資料' + (b.user_evidence ? "（有）" : "") + "</button></div>" +
+    '<div class="row wrap"><button class="btn soft sm" data-act="wish-to-read">' + ICON.plus + "開始讀，移到我的書</button>" +
+    '<button class="btn ghost sm" data-act="book-edit">編輯</button></div>';
+  if (live && live.status !== "done") html += jobCard(live);
+  if (!ev) return html + (live ? "" : '<section class="card"><div class="empty">還沒有評估。按「開始評估」，電腦會上網找資料，大約 1～3 分鐘。</div></section>');
+
+  const L = LIGHT[ev.credibility.light] || LIGHT.unknown, V = VERDICT[ev.verdict.level] || VERDICT.skim;
+  html += '<section class="card verdict ' + V[1] + '"><div class="row between"><div class="label">結論</div><span class="chip ' + V[1] + '" style="font-size:15px">' + V[0] + "</span></div>" +
+    '<p style="margin:0;line-height:1.75">' + evalCite(ev.verdict.text) + "</p>" +
+    (ev.book.summary ? '<div class="small muted">' + evalCite(ev.book.summary) + "</div>" : "") + "</section>";
+
+  html += '<section class="card"><div class="row between"><div class="label">可信度（防唬爛）</div><span class="chip ' + L[1] + '">' + L[2] + " " + L[0] + "</span></div>" +
+    (ev.credibility.headline ? "<b>" + evalCite(ev.credibility.headline) + "</b>" : "") +
+    (ev.credibility.author ? '<div class="pt"><span class="kind">作者</span><span>' + evalCite(ev.credibility.author) + "</span></div>" : "") +
+    (ev.credibility.reasons.length ? '<ul class="ev-list">' + ev.credibility.reasons.map(x => "<li>" + evalItem(x) + "</li>").join("") + "</ul>" : "") + "</section>";
+
+  const R = ev.reception;
+  html += '<section class="card"><div class="label">讀者怎麼說</div>' + (R.headline ? "<b>" + evalCite(R.headline) + "</b>" : "") +
+    (R.ratings.length ? '<div class="row wrap">' + R.ratings.map(r => '<span class="chip blue">' + esc(r.site) + " " + esc(r.score) + (r.count ? "（" + esc(r.count) + "）" : "") + "</span>" + evalCite(r.src)).join("") + "</div>" : "") +
+    (R.pros.length ? '<div class="pref-h">收穫</div><ul class="ev-list pro">' + R.pros.map(x => "<li>" + evalItem(x) + "</li>").join("") + "</ul>" : "") +
+    (R.cons.length ? '<div class="pref-h">失望的地方</div><ul class="ev-list con">' + R.cons.map(x => "<li>" + evalItem(x) + "</li>").join("") + "</ul>" : "") + "</section>";
+
+  if (ev.fit && ev.fit.text) html += '<section class="card"><div class="row between"><div class="label">適合你嗎</div>' + (ev.fit.relation ? '<span class="chip green">' + esc(ev.fit.relation) + "</span>" : "") + "</div>" +
+    '<p style="margin:0;line-height:1.75">' + evalCite(ev.fit.text) + "</p></section>";
+  if ((ev.alternatives || []).length) html += '<section class="card"><div class="label">也可以考慮</div><div class="stack">' + ev.alternatives.map(a =>
+    '<div class="pt"><span>📘</span><span><b>' + esc(a.title) + "</b>" + (a.author ? "　" + esc(a.author) : "") + (a.why ? '<div class="small muted">' + evalCite(a.why) + "</div>" : "") + "</span></div>").join("") + "</div></section>";
+  if ((ev.gaps || []).length) html += '<section class="card flat"><div class="label">還缺的資料</div><ul class="ev-list">' + ev.gaps.map(g => "<li>" + esc(g) + "</li>").join("") + "</ul>" +
+    '<div class="small muted">有這方面的資料（例如微信讀書的點評），可以按「補充資料」貼進來再評估一次。</div></section>';
+
+  const st = ev.stats || {};
+  html += '<section class="card"><details><summary class="adv-sum"><b>來源（' + (ev.sources || []).length + "）</b>" +
+    '<span class="small muted">　搜尋 ' + (st.searched || 0) + " 次・讀了 " + (st.fetched || 0) + " 頁・" + (st.blocked || 0) + " 頁讀不到</span></summary>" +
+    '<div class="stack" style="margin-top:12px">' + (ev.sources || []).map(srcLine).join("") + "</div></details>" +
+    '<div class="tiny muted">' + esc(ev.model || "") + " · " + esc(ev.at || "") + "</div></section>";
+  return html;
+}
+
+function srcLine(s){
+  return '<a class="src" href="' + esc(s.url) + '" target="_blank" rel="noopener noreferrer"><span class="n">' + s.n + '</span><span class="body"><span class="lbl">' + esc(s.title) + '</span>' +
+    '<div class="snip">' + esc(s.domain) + " · " + ({review: "評價", author: "作者", critique: "批評"}[s.category] || "") + " · " + (s.fetched ? "已讀全文" : "只看到摘要" + (s.why ? "（" + esc(s.why) + "）" : "")) + "</div></span></a>";
+}
+
+function evalSourceSheet(n){
+  const ev = S.book && S.book.book.evaluation;
+  if (!ev) return;
+  if (n === "U") return openSheet('<div class="label">你補充的資料</div><div class="thought">' + esc(S.book.book.user_evidence || "") + "</div>");
+  if (n[0] === "K"){
+    const k = (ev.notes || []).find(x => "K" + x.k === n);
+    if (!k) return;
+    const act = k.kind === "lecture" ? '<button class="btn block green" data-act="open-lecture" data-id="' + k.lecture_id + '" data-t="' + (k.t0 || 0) + '">' + ICON.play + "從 " + fmtT(k.t0) + " 開始聽</button>"
+      : k.book_id ? '<button class="btn block" data-act="open-book" data-id="' + k.book_id + '">打開這本書</button>' : "";
+    return openSheet('<div class="label">你的知識庫 [' + n + "]</div><h3>" + esc(k.label) + '</h3><div class="thought">' + esc(k.text) + "</div>" + act);
+  }
+  const s = (ev.sources || []).find(x => String(x.n) === n);
+  if (!s) return;
+  openSheet('<div class="label">來源 [' + n + "]・" + esc(s.domain) + "</div><h3>" + esc(s.title) + "</h3>" +
+    (s.snippet ? '<div class="quote">' + esc(s.snippet) + "</div>" : "") +
+    '<div class="small muted">' + (s.fetched ? "電腦已讀過這頁的正文" : "只看到搜尋摘要" + (s.why ? "（" + esc(s.why) + "）" : "")) + "</div>" +
+    '<a class="btn block" href="' + esc(s.url) + '" target="_blank" rel="noopener noreferrer">打開網頁 ↗</a>');
+}
+
+/* 先試手機內建的條碼辨識（不用花 AI），讀不到再請 AI 看封面 */
+async function identifyCover(file){
+  try {
+    if ("BarcodeDetector" in window){
+      const bd = new BarcodeDetector({formats: ["ean_13"]});
+      const bmp = await createImageBitmap(file);
+      const codes = await bd.detect(bmp);
+      const isbn = (codes.map(c => c.rawValue).find(v => /^97[89]\d{10}$/.test(v)) || "");
+      if (isbn){
+        const r = await api("/lookup?isbn=" + isbn);
+        return Object.assign({isbn}, r.book);
+      }
+    }
+  } catch (e) {}
+  const blob = await shrinkImage(file, 1600);
+  return (await api("/identify", {method: "POST", body: blob, headers: {"Content-Type": "image/jpeg"}})).book;
+}

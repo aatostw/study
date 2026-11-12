@@ -1,0 +1,39 @@
+# 學習筆記用的自架搜尋（SearXNG）。只給這台電腦的學習伺服器用。
+use_default_settings: true
+
+general:
+  instance_name: "study-search"
+
+server:
+  secret_key: "replace-me-on-the-pc"  # 安裝時換成隨機字串
+  limiter: false          # 只有自己用，不需要限流
+  image_proxy: false
+  public_instance: false
+
+search:
+  safe_search: 0
+  default_lang: "zh-TW"
+  formats:
+    - html
+    - json                # 學習伺服器要用 JSON
+
+outgoing:
+  request_timeout: 6.0
+  max_request_timeout: 12.0
+
+# 預設只開 DuckDuckGo 等少數引擎；這裡把中英文書評常用的都打開
+#   google、bing：一般網頁　baidu、360search：中國網站
+#   sogou wechat：微信公眾號文章（很多中文書評在這裡）
+engines:
+  - name: google
+    disabled: false
+  - name: bing
+    disabled: false
+  - name: baidu
+    disabled: false
+  - name: sogou
+    disabled: false
+  - name: sogou wechat
+    disabled: false
+  - name: 360search
+    disabled: false
