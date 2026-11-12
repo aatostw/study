@@ -86,6 +86,12 @@ def generate(task, prompt, json_mode):
                            "verdict": {"level": "skim", "text": "核心觀念值得了解，對話部分可以挑章節讀。"},
                            "alternatives": [{"title": "阿德勒心理學講義", "author": "阿德勒", "why": "原典"}],
                            "gaps": ["缺少專業心理學者的書評"], "followup_queries": []}, ensure_ascii=False)
+    if task == "review":
+        return json.dumps({"headline": "這週在想「語言能不能說清楚道」", "highlights": [{"title": "道不可言說", "text": "老子認為真正的道超越語言 [1]。"},
+                           {"title": "無為", "text": "無為是不刻意、不強求，不是什麼都不做 [2]。"}],
+                           "connections": [{"text": "課程談的語言界限，和你在記事本寫的上善若水互相呼應 [1][2]。"}],
+                           "questions": [{"q": "如果道說不清楚，我們要怎麼學它？", "why": "連到這週的兩個重點"},
+                                         {"q": "無為在工作上可以怎麼實踐？", "why": "把觀念落到生活"}]}, ensure_ascii=False)
     if task == "ocr" and "ISBN" in prompt:
         return json.dumps({"isbn": "9789861371955", "title": "被討厭的勇氣", "author": "岸見一郎"}, ensure_ascii=False)
     if task == "ocr":

@@ -407,3 +407,10 @@ h1,h2{color:var(--primary-text)}
 .mic:disabled{opacity:.85}
 @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--danger) 55%,transparent)}70%{box-shadow:0 0 0 18px transparent}100%{box-shadow:0 0 0 0 transparent}}
 .voice-label{font-size:13.5px;color:var(--muted);text-align:center}
+
+/* ---------- 知識複習 ---------- */
+.rv-head{margin:0;font-size:18px;font-weight:700;line-height:1.6}
+.rv-item{display:flex;gap:12px;align-items:flex-start}
+.rv-n{flex:none;width:28px;height:28px;border-radius:9px;background:var(--yellow);display:grid;place-items:center;font:700 14px var(--font-en);color:#2B2520;margin-top:2px}
+.rv-text{font-size:15px;line-height:1.75}
+.list-row.rv-q .t b{white-space:normal;overflow:visible;text-overflow:clip}

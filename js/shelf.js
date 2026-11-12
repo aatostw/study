@@ -122,10 +122,58 @@ async function importSheet(){
   if (S.sheet) draw();
 }
 
-/* ---------- 知識複習（第 4 步才會做）---------- */
+/* ---------- 知識複習：每週日早上 7 點自動，也可以隨時「產生本週至今」 ---------- */
+async function loadReviews(){
+  S.reviews = (await api("/reviews")).reviews; S.err.load = "";
+  if (!S.reviewId && S.reviews.length) S.reviewId = S.reviews[0].id;
+  if (S.reviewId) await loadReview(S.reviewId, true);
+  render();
+}
+async function loadReview(id, quiet){
+  const j = await api("/reviews/" + id);
+  S.review = j.review; S.reviewId = id;
+  if (!quiet) render();
+}
+function rvCite(text){
+  return esc(text || "").replace(/\[(\d{1,2})\]/g, (m, n) => '<button class="cite" data-act="rv-src" data-n="' + n + '">' + n + "</button>");
+}
 function renderReview(){
-  return '<section class="card hero"><div class="label">知識複習</div><h1>每週日早上 7 點</h1><div class="sub">把這一週讀的書、記的筆記、上的課整理成一篇：本週重點、跨內容的關聯，還有幾個開放式問題，點問題就能到助理接著聊。整篇可以朗讀。</div></section>' +
-    '<section class="card flat"><div class="empty">這一頁還在做，下一步就會上線。</div></section>';
+  let html = '<section class="card hero"><div class="label">知識複習</div><h1>' + (S.review && S.review.content && S.review.content.label ? esc(S.review.content.label) : "這一週") + "</h1>" +
+    '<div class="sub">每週日早上 7 點自動整理週一到週六；平常也可以先看本週至今。</div>' +
+    '<div class="row wrap"><button class="btn soft sm" data-act="rv-make"' + (S.busy.rv ? " disabled" : "") + ">" + ICON.spark + "產生本週至今</button>" +
+    ((S.reviews || []).length > 1 ? '<button class="btn ghost sm" data-act="rv-list" style="color:#fff">以前的複習 ›</button>' : "") + "</div></section>";
+  if (!S.reviews) return html + loading();
+  const live = (S.jobs || []).find(j => j.kind === "review" && j.status !== "done");
+  if (live) html += jobCard(live);
+  const r = S.review;
+  if (!r) return html + (live ? "" : '<section class="card"><div class="empty">還沒有複習。按「產生本週至今」先看看這週的整理。</div></section>');
+  const c = r.content || {};
+  if (r.status === "empty") return html + '<section class="card"><div class="empty">這一週（' + esc(c.label || "") + "）還沒有新的筆記、書或課程，沒有東西可以複習。</div></section>";
+  if (r.status === "error" && !c.headline) return html + '<div class="err">這篇複習沒有做好，再按一次「產生本週至今」。</div>';
+  if (!c.headline) return html;
+  const cnt = c.counts || {};
+  html += '<section class="card" data-read="知識複習"><div class="row between no-read"><div class="label">本週主軸</div>' +
+    '<button class="btn soft sm" data-act="rv-read">' + ICON.speaker + "朗讀整篇</button></div>" +
+    '<p class="rv-head">' + esc(c.headline) + "</p>" +
+    '<div class="row wrap no-read">' + [["book", "書"], ["note", "記事本"], ["lecture", "課程"]].filter(k => cnt[k[0]]).map(k => '<span class="chip">' + k[1] + " " + cnt[k[0]] + " 則</span>").join("") +
+    (cnt.chat ? '<span class="chip">問過助理</span>' : "") + "</div></section>";
+  if ((c.highlights || []).length) html += '<section class="card"><div class="label">本週重點</div><div class="stack">' + c.highlights.map((h, i) =>
+    '<div class="rv-item"><span class="rv-n">' + (i + 1) + '</span><div><b>' + esc(h.title) + '</b><div class="rv-text">' + rvCite(h.text) + "</div></div></div>").join("") + "</div></section>";
+  if ((c.connections || []).length) html += '<section class="card"><div class="label">跨內容的關聯</div><div class="stack">' + c.connections.map(x =>
+    '<div class="pt"><span>🔗</span><span class="rv-text">' + rvCite(x.text) + "</span></div>").join("") + "</div></section>";
+  if ((c.questions || []).length) html += '<section class="card"><div class="label">可以再想的問題</div><div class="small muted">點一題，到助理接著聊。</div><div class="stack">' + c.questions.map((q, i) =>
+    '<button class="list-row rv-q" data-act="rv-ask" data-i="' + i + '"><span class="ic">💭</span><span class="t"><b>' + esc(q.q) + '</b><span class="sub">' + esc(q.why || "") + '</span></span><span class="chev">›</span></button>').join("") + "</div></section>";
+  html += '<section class="card flat"><details><summary class="adv-sum"><b>這週的資料（' + (c.sources || []).length + "）</b></summary>" +
+    '<div class="stack" style="margin-top:10px">' + (c.sources || []).map(s => '<button class="src" data-act="rv-src" data-n="' + s.n + '"><span class="n">' + s.n + '</span><span class="body"><span class="lbl">' + esc(s.label) + "</span></span></button>").join("") + "</div></details>" +
+    '<div class="tiny muted">' + (r.auto ? "週日自動產生" : "手動產生") + " · " + esc(r.model || "") + "</div></section>";
+  return html;
+}
+function reviewListSheet(){
+  openSheet("<h2>以前的複習</h2><div class=\"stack\">" + (S.reviews || []).map(r => {
+    const d = new Date(r.week_start + "T00:00:00");
+    return '<button class="list-row" data-act="rv-open" data-id="' + r.id + '"><span class="t"><b>' + (d.getMonth() + 1) + "/" + d.getDate() + " 那一週" + (r.id === S.reviewId ? "（正在看）" : "") +
+      '</b><span class="sub">' + esc(r.headline || {queued: "產生中…", empty: "那週沒有資料", error: "沒有做好"}[r.status] || "") + '</span></span><span class="chev">›</span></button>';
+  }).join("") + "</div>");
 }
 
 /* =========================================================

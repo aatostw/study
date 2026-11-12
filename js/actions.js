@@ -46,7 +46,7 @@ async function pollJobs(now){
     for (const j of S.jobs){
       if ((j.status === "done" || j.status === "error") && before.get(j.id) && before.get(j.id) !== j.status){
         changed = true;
-        if (j.status === "done") toast({lecture: "課程處理好了：", resummarize: "重新摘要好了：", bookfile: "原文讀好了：", analyze: "分析好了：", evaluate: "完成："}[j.kind] + j.title);
+        if (j.status === "done") toast({lecture: "課程處理好了：", resummarize: "重新摘要好了：", bookfile: "原文讀好了：", analyze: "分析好了：", evaluate: "完成：", review: "整理好了："}[j.kind] + j.title);
       }
     }
     if (changed){
@@ -54,6 +54,7 @@ async function pollJobs(now){
       else if (S.sub && S.sub.type === "book") loadBook().catch(() => {});
       else if (S.view === "lectures") loadLectures().catch(() => {});
       else if (S.view === "books") loadShelf().catch(() => {});
+      else if (S.view === "review") loadReviews().catch(() => {});
       else if (S.view === "mybooks" || S.view === "ask") loadBooks().catch(() => {});
     }
     renderSoon();
@@ -176,6 +177,25 @@ const ACT = {
     await api("/chats/" + id, {method: "DELETE"}).catch(e => toast(errMsg(e)));
     if (S.chat && S.chat.id === id) S.chat = null;
     await loadChats(); chatHistorySheet(); render();
+  },
+
+  /* 知識複習 */
+  "rv-make": () => act("rv", async () => { const r = await api("/reviews", {method: "POST"}); S.reviewId = r.review_id; toast("開始整理本週，大約一分鐘"); pollJobs(true); await loadReviews(); }),
+  "rv-list": () => reviewListSheet(),
+  "rv-open": el => { closeSheet(); loadReview(Number(el.dataset.id)).catch(e => toast(errMsg(e))); $("#main").scrollTop = 0; },
+  "rv-read": () => { const c = S.review && S.review.content; if (c && c.speech) readAloud(c.speech, "知識複習 " + (c.label || "")); },
+  "rv-ask": el => {
+    const q = S.review.content.questions[Number(el.dataset.i)];
+    S.chat = null; S.assist = null;
+    go("ask"); chatSend(q.q);
+  },
+  "rv-src": el => {
+    const s = ((S.review && S.review.content.sources) || []).find(x => String(x.n) === el.dataset.n);
+    if (!s) return;
+    if (s.kind === "book") ACT["open-book"]({dataset: {id: s.id}});
+    else if (s.kind === "note") ACT["open-note"]({dataset: {id: s.id}});
+    else if (s.kind === "lecture") ACT["open-lecture"]({dataset: {id: s.id}});
+    else toast(s.label);
   },
 
   /* 書櫃 */

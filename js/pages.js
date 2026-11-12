@@ -14,6 +14,7 @@ async function load(){
     if (S.view === "books") return await loadShelf();
     if (S.view === "mybooks") return await loadBooks();
     if (S.view === "notebook") return await loadNotebook();
+    if (S.view === "review") return await loadReviews();
     if (S.view === "lectures"){ loadInbox(); return await loadLectures(); }
     if (S.view === "prefs"){ loadStatus().catch(() => {}); return await loadSettings(); }
   } catch (e) { if (!e.relogin){ S.err.load = errMsg(e); render(); } }
@@ -64,7 +65,7 @@ function sourceSheet(s){
 /* ---------- 書櫃 ---------- */
 function jobCard(job){
   if (!job || job.status === "done") return "";
-  const name = {bookfile: "讀取原文", analyze: "AI 分析", lecture: "處理課程", resummarize: "重新摘要", evaluate: "選書評估"}[job.kind] || "處理中";
+  const name = {bookfile: "讀取原文", analyze: "AI 分析", lecture: "處理課程", resummarize: "重新摘要", evaluate: "選書評估", review: "知識複習"}[job.kind] || "處理中";
   if (job.status === "error") return '<div class="err">' + name + "失敗：" + esc(job.error) + '</div><button class="btn soft sm" data-act="job-retry" data-id="' + job.id + '">再試一次</button>';
   return '<div class="up"><div class="row between"><b class="small">' + name + '</b><span class="tiny muted">' + (job.status === "queued" ? "排隊中" : Math.round(job.progress * 100) + "%") + "</span></div>" +
     progressBar(job.progress) + '<div class="small muted">' + esc(job.step || "等前面的工作做完") + "</div></div>";

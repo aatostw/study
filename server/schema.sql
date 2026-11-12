@@ -165,3 +165,16 @@ BEGIN
     INSERT INTO settings (k, v) VALUES ('chats_migrated', 'true');
   END IF;
 END $$;
+
+-- 知識複習：每週一篇（週一～週日；週日早上 7 點自動做到週六為止，也可以隨時手動做「本週至今」）
+CREATE TABLE IF NOT EXISTS reviews (
+  id bigserial PRIMARY KEY,
+  week_start date NOT NULL UNIQUE,            -- 那一週的星期一
+  range_end timestamptz NOT NULL,             -- 資料算到什麼時候
+  auto boolean NOT NULL DEFAULT false,        -- 週日早上自動產生的
+  status text NOT NULL DEFAULT 'queued',      -- queued / ready / error / empty
+  content jsonb,
+  model text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);

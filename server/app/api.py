@@ -12,7 +12,7 @@ import time
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response, StreamingResponse
 
-from . import ai, bookeval, chat, config, db, engines, jobs, knowledge, tts, websearch
+from . import ai, bookeval, chat, review, config, db, engines, jobs, knowledge, tts, websearch
 from .textutil import fmt_t, tts_parts
 
 app = FastAPI(title="study-server", docs_url=None, redoc_url=None, openapi_url=None)
@@ -762,6 +762,33 @@ async def stt(request: Request):
 def chat_del(cid: int):
     db.run("DELETE FROM chats WHERE id = %s", (cid,))
     return {"ok": True}
+
+
+# ---------- 知識複習 ----------
+
+@app.get("/reviews")
+def reviews():
+    rows = db.all("SELECT id, week_start, range_end, auto, status, updated_at, content->>'headline' AS headline FROM reviews ORDER BY week_start DESC LIMIT 60")
+    for r in rows:
+        r["week_start"] = r["week_start"].isoformat()
+    return {"ok": True, "reviews": rows}
+
+
+@app.get("/reviews/{rid}")
+def review_get(rid: int):
+    r = db.one("SELECT * FROM reviews WHERE id = %s", (rid,))
+    if not r:
+        raise Bad("找不到這篇複習", 404)
+    r["week_start"] = r["week_start"].isoformat()
+    r["job"] = db.one("SELECT id, kind, status, step, progress, error FROM jobs WHERE kind = 'review' AND ref_id = %s ORDER BY id DESC LIMIT 1", (rid,))
+    return {"ok": True, "review": r}
+
+
+@app.post("/reviews")
+def review_make():
+    """手動：產生（或重做）本週至今的複習"""
+    r, j = review.request()
+    return {"ok": True, "review_id": r["id"], "job": j}
 
 
 @app.get("/search")
