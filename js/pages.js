@@ -49,16 +49,17 @@ function answerHTML(r, ctx){
       '<div class="stack" style="margin-top:8px">' + rest.map(s => srcRow(s, ctx)).join("") + "</div></details>" : "") + "</div></section>";
 }
 function srcRow(s, ctx){
-  const kind = {note: "筆記", book: "原文", lecture: "課程"}[s.kind] || "";
+  const kind = {note: "筆記", book: "原文", lecture: "課程", web: "網路"}[s.kind] || "";
   return '<button class="src' + (s.cited ? " cited" : "") + '" data-act="src" data-ctx="' + ctx + '" data-n="' + s.n + '"><span class="n">' + s.n + '</span><span class="body"><span class="lbl">' +
-    '<span class="chip ' + (s.kind === "lecture" ? "green" : s.kind === "note" ? "yellow" : "blue") + '" style="padding:0 7px;font-size:12px;margin-right:6px">' + kind + "</span>" + esc(s.label) +
+    '<span class="chip ' + (s.kind === "lecture" ? "green" : s.kind === "note" ? "yellow" : s.kind === "web" ? "" : "blue") + '" style="padding:0 7px;font-size:12px;margin-right:6px">' + kind + "</span>" + esc(s.label) + (s.domain ? '<span class="tiny muted">　' + esc(s.domain) + "</span>" : "") +
     '</span><div class="snip clamp2">' + esc(s.text) + "</div></span></button>";
 }
 function sourceSheet(s){
   let acts = "";
   if (s.kind === "lecture") acts = '<button class="btn block green" data-act="open-lecture" data-id="' + s.lecture_id + '" data-t="' + (s.t0 || 0) + '">' + ICON.play + "從 " + fmtT(s.t0) + " 開始聽</button>";
   else if (s.book_id) acts = '<button class="btn block" data-act="open-book" data-id="' + s.book_id + '">打開這本書</button>';
-  openSheet('<div class="label">出處 [' + s.n + "]</div><h3>" + esc(s.label) + "</h3>" +
+  else if (s.kind === "web" && s.url) acts = '<a class="btn block" href="' + esc(s.url) + '" target="_blank" rel="noopener noreferrer">打開網頁 ↗</a>';
+  openSheet('<div class="label">出處 [' + s.n + "]" + (s.domain ? "・" + esc(s.domain) : "") + "</div><h3>" + esc(s.label) + "</h3>" +
     '<div class="' + (s.kind === "note" ? "thought" : "quote") + '">' + esc(s.text) + "</div>" + acts);
 }
 

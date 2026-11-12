@@ -164,6 +164,7 @@ const ACT = {
   "assist": el => { S.assist = el.dataset.v || null; render.last = null; render(); $("#main").scrollTop = 0; if (!S.books) loadBooks(); },
   "ask-focus": () => { const q = $("#chat-in"); if (q) q.focus(); },
   "chat-send": () => chatSend(($("#chat-in") || {}).value),
+  "chat-opt": el => { const k = el.dataset.k; S.chatOpts[k] = !S.chatOpts[k]; lsSet("chat_" + k, S.chatOpts[k] ? null : "0"); render(); },
   "voice-mode": el => { S.voice = el.dataset.v === "1"; lsSet("voice", S.voice ? "1" : null); if (!S.voice && S.rec.state === "rec") REC.stop(true); render(); },
   "mic": () => { if (S.rec.state === "rec") REC.stop(); else if (S.rec.state === "idle" && !S.chatPending) REC.start(); },
   "mic-cancel": () => REC.stop(true),

@@ -6,6 +6,7 @@ S.chat = null;            // {id, title, messages:[]}
 S.chats = null;           // 對話紀錄
 S.chatPending = null;     // 送出中的那句話
 S.voice = lsGet("voice") === "1";   // 語音模式
+S.chatOpts = {kb: lsGet("chat_kb") !== "0", web: lsGet("chat_web") !== "0"};   // 引用書櫃／網路搜尋
 S.rec = {state: "idle"};  // idle / rec / stt
 
 async function loadChats(){ S.chats = (await api("/chats")).chats; renderSoon(); }
@@ -16,10 +17,7 @@ async function openChat(id){
 }
 
 function renderAssist(){
-  let html = '<div class="assist-top"><div class="chips">' +
-    '<button class="chip-btn" data-act="ask-focus">💬 問我的筆記</button>' +
-    "</div>" +
-    "</div></div>" +
+  let html = "" +
     '<div class="row between assist-bar"><div class="mode-seg" role="group" aria-label="模式">' +
       '<button data-act="voice-mode" data-v="0" aria-pressed="' + !S.voice + '">⌨️ 文字</button><button data-act="voice-mode" data-v="1" aria-pressed="' + S.voice + '">🎙️ 語音</button></div>' +
     '<span class="row"><button class="btn ghost sm" data-act="chat-history">🕘 紀錄</button>' +
@@ -27,18 +25,19 @@ function renderAssist(){
 
   const msgs = (S.chat && S.chat.messages) || [];
   if (!msgs.length && !S.chatPending){
-    html += '<section class="card hero"><div class="label">助理</div><h1>想問什麼？</h1><div class="sub">我會翻你的書、筆記、課程回答，每句都標出處。說「評估《書名》」，我也會上網幫你看這本書值不值得讀。</div></section>' +
-      '<div class="stack">' + ["老子和莊子對「無為」的看法有什麼不同？", "這週上課講的重點是什麼？", "幫我評估《原子習慣》"].map(q =>
-        '<button class="list-row" data-act="chat-example" data-q="' + esc(q) + '"><span class="t"><b>' + esc(q) + '</b></span><span class="chev">›</span></button>').join("") + "</div>";
+    html += '<section class="card hero"><div class="label">助理</div><h1>想聊什麼？</h1><div class="sub">勾「引用書櫃」會翻你的書、筆記、課程回答並標出處；勾「網路搜尋」會上網找資料；兩個都不勾就直接聊。</div></section>';
   } else {
     html += '<div class="thread">' + msgs.map(msgHTML).join("");
     if (S.chatPending) html += '<div class="msg user"><div class="bubble">' + esc(S.chatPending) + "</div></div>" +
-      '<div class="msg ai"><div class="bubble typing"><span></span><span></span><span></span></div><div class="tiny muted">正在翻你的筆記…</div></div>';
+      '<div class="msg ai"><div class="bubble typing"><span></span><span></span><span></span></div><div class="tiny muted">' + (S.chatOpts.kb && S.chatOpts.web ? "正在翻你的書櫃、上網找資料…" : S.chatOpts.kb ? "正在翻你的書櫃…" : S.chatOpts.web ? "正在上網找資料…" : "思考中…") + "</div></div>";
     html += "</div>";
   }
   if (S.err.chat) html += '<div class="err">' + esc(S.err.chat) + "</div>";
-  const scope = '<div class="scope-mini">' + [["all", "全部"], ["books", "書和筆記"], ["lectures", "課程"]].map(o =>
-      '<button data-act="ask-scope" data-v="' + o[0] + '" aria-pressed="' + (S.ask.scope === o[0]) + '">' + o[1] + "</button>").join("") + "</div>";
+  const o = S.chatOpts;
+  const scope = '<div class="scope-mini">' +
+    '<button class="tog" data-act="chat-opt" data-k="kb" aria-pressed="' + o.kb + '"><span class="box">' + (o.kb ? "✓" : "") + "</span>引用書櫃為主</button>" +
+    '<button class="tog" data-act="chat-opt" data-k="web" aria-pressed="' + o.web + '"><span class="box">' + (o.web ? "✓" : "") + "</span>網路搜尋</button>" +
+    (!o.kb && !o.web ? '<span class="tiny muted">直接聊</span>' : "") + "</div>";
   if (S.voice){
     html += '<div class="composer voice">' + scope + voiceHTML() + "</div>";
     return html;
@@ -75,7 +74,7 @@ async function chatSend(text){
   if (!text || S.chatPending) return;
   S.chatPending = text; S.chatDraft = ""; S.err.chat = ""; S.chatScroll = true; render();
   try {
-    const r = await api("/chat", {json: {chat_id: S.chat && S.chat.id, message: text, scope: S.ask.scope}});
+    const r = await api("/chat", {json: {chat_id: S.chat && S.chat.id, message: text, kb: S.chatOpts.kb, web: S.chatOpts.web}});
     if (!S.chat || S.chat.id !== r.chat.id) S.chat = {id: r.chat.id, title: r.chat.title, messages: (S.chat && S.chat.id === r.chat.id) ? S.chat.messages : []};
     S.chat.messages.push(...r.messages);
     if (r.messages.some(m => m.card)){ pollJobs(true); loadBooks(true).then(renderSoon).catch(() => {}); }
