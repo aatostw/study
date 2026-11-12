@@ -68,7 +68,7 @@ def _gather(start, end):
                 ("摘句：" + n["quote"] + " ") * bool(n["quote"]) + ("想法：" + n["content"]) * bool(n["content"]))
         else:
             add("note", n["id"], "記事本：" + (n["title"] or "（無標題）"), n["content"][:1500])
-    for b in db.all("SELECT id, title, author, analysis FROM books WHERE shelf = 'read' AND analysis IS NOT NULL "
+    for b in db.all("SELECT id, title, author, analysis FROM books WHERE analysis IS NOT NULL "
                     "AND updated_at >= %s AND updated_at < %s", (start, end)):
         a = b["analysis"] or {}
         add("book", b["id"], "《%s》AI 分析" % b["title"], (a.get("summary") or "") + " 主題：" + "、".join(t.get("title", "") for t in a.get("themes") or []))
@@ -77,7 +77,7 @@ def _gather(start, end):
         s = l["summary"] or {}
         secs = "；".join("%s：%s" % (x.get("title", ""), x.get("summary", "")) for x in s.get("sections") or [])
         add("lecture", l["id"], "%s%s（課程）" % ((l["course"] + "｜") if l["course"] else "", l["title"]), (s.get("overview") or "") + " " + secs)
-    for b in db.all("SELECT id, title, evaluation FROM books WHERE shelf = 'wish' AND evaluation IS NOT NULL AND updated_at >= %s AND updated_at < %s", (start, end)):
+    for b in db.all("SELECT id, title, evaluation FROM books WHERE evaluation IS NOT NULL AND updated_at >= %s AND updated_at < %s", (start, end)):
         v = (b["evaluation"] or {}).get("verdict") or {}
         add("book", b["id"], "《%s》選書評估" % b["title"], v.get("text", ""))
     qs = db.all("SELECT content FROM chat_msgs WHERE role = 'user' AND created_at >= %s AND created_at < %s ORDER BY id", (start, end))

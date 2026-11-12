@@ -16,12 +16,9 @@ async function openChat(id){
 }
 
 function renderAssist(){
-  if (S.assist === "wish") return renderWishList();
-  const nWish = (S.books || []).filter(b => b.shelf === "wish").length;
   let html = '<div class="assist-top"><div class="chips">' +
     '<button class="chip-btn" data-act="ask-focus">💬 問我的筆記</button>' +
-    '<button class="chip-btn" data-act="wish-new">📖 評估一本書</button>' +
-    '<button class="chip-btn" data-act="assist" data-v="wish">📚 想讀清單' + (nWish ? "（" + nWish + "）" : "") + "</button></div>" +
+    "</div>" +
     "</div></div>" +
     '<div class="row between assist-bar"><div class="mode-seg" role="group" aria-label="模式">' +
       '<button data-act="voice-mode" data-v="0" aria-pressed="' + !S.voice + '">⌨️ 文字</button><button data-act="voice-mode" data-v="1" aria-pressed="' + S.voice + '">🎙️ 語音</button></div>' +
@@ -30,7 +27,7 @@ function renderAssist(){
 
   const msgs = (S.chat && S.chat.messages) || [];
   if (!msgs.length && !S.chatPending){
-    html += '<section class="card hero"><div class="label">助理</div><h1>想問什麼？</h1><div class="sub">我會翻你的書、筆記、課程回答，每句都標出處；也可以叫我評估一本書。</div></section>' +
+    html += '<section class="card hero"><div class="label">助理</div><h1>想問什麼？</h1><div class="sub">我會翻你的書、筆記、課程回答，每句都標出處。說「評估《書名》」，我也會上網幫你看這本書值不值得讀。</div></section>' +
       '<div class="stack">' + ["老子和莊子對「無為」的看法有什麼不同？", "這週上課講的重點是什麼？", "幫我評估《原子習慣》"].map(q =>
         '<button class="list-row" data-act="chat-example" data-q="' + esc(q) + '"><span class="t"><b>' + esc(q) + '</b></span><span class="chev">›</span></button>').join("") + "</div>";
   } else {

@@ -251,14 +251,8 @@ const ACT = {
   "src": el => { const s = findSource(el.dataset.ctx, el.dataset.n); if (s) sourceSheet(s); },
 
   /* 書 */
-  "open-book": el => { closeSheet(); S.book = null; go(["ask", "mybooks"].includes(S.view) ? S.view : "books", {type: "book", id: Number(el.dataset.id)}); },
-  "book-new": () => openSheet('<h2>新增一本書</h2><div class="field"><label for="b-title">書名</label><input class="input" id="b-title" placeholder="道德經"></div>' +
-    '<div class="field"><label for="b-author">作者</label><input class="input" id="b-author" placeholder="老子"></div><button class="btn block" data-act="book-create">新增</button>'),
-  "book-create": () => {
-    const title = $("#b-title").value.trim();
-    if (!title) return toast("請填書名");
-    act("bookc", async () => { const r = await api("/books", {json: {title, author: $("#b-author").value.trim()}}); closeSheet(); S.books = null; go(S.view === "mybooks" ? "mybooks" : "books", {type: "book", id: r.book.id}); });
-  },
+  "open-book": el => { closeSheet(); S.book = null; S.evalOpen = false; go(["ask", "mybooks"].includes(S.view) ? S.view : "books", {type: "book", id: Number(el.dataset.id)}); },
+  "book-new": () => { S.wishKeep = null; wishSheet({}); },
   "book-edit": () => { const b = S.book.book; openSheet('<h2>編輯書的資料</h2><div class="field"><label for="b-title">書名</label><input class="input" id="b-title" value="' + esc(b.title) + '"></div>' +
     '<div class="field"><label for="b-author">作者</label><input class="input" id="b-author" value="' + esc(b.author) + '"></div><button class="btn block" data-act="book-save">儲存</button>' +
     '<button class="btn ghost block" data-act="book-del" style="color:var(--danger)">刪除這本書（含所有筆記）</button>'); },
@@ -268,13 +262,22 @@ const ACT = {
     act("bookd", async () => { await api("/books/" + S.sub.id, {method: "DELETE"}); closeSheet(); S.books = null; go(S.view); });
   },
   /* 想讀 */
-  "wish-back": () => { S.assist = "wish"; go("ask"); },
-  "wish-new": () => wishSheet({}),
+  "wish-new": () => { S.wishKeep = null; wishSheet({}); },
   "wish-create": () => {
-    const body = {shelf: "wish", title: $("#w-title").value.trim(), author: $("#w-author").value.trim(), isbn: $("#w-isbn").value.trim(), wish_note: $("#w-note").value.trim()};
+    const body = {shelf: "wish", title: $("#w-title").value.trim(), author: $("#w-author").value.trim(), isbn: $("#w-isbn").value.trim(), wish_note: $("#w-note").value.trim(), evaluate: $("#w-eval").checked};
     if (!body.title && !body.isbn) return toast("請填書名或 ISBN");
-    act("wishc", async () => { const r = await api("/books", {json: body}); closeSheet(); S.books = null; S.assist = "wish"; pollJobs(true); go("ask", {type: "book", id: r.book.id}); });
+    act("wishc", async () => {
+      const r = await api("/books", {json: body}); closeSheet(); S.books = null; S.evalOpen = false;
+      if (body.evaluate) pollJobs(true);
+      go(S.view === "mybooks" ? "mybooks" : "books", {type: "book", id: r.book.id});
+    });
   },
+  "eval-toggle": () => { S.evalOpen = !S.evalOpen; render(); },
+  "shelf-set": el => act("books", async () => {
+    await api("/books/" + S.sub.id, {method: "PATCH", json: {shelf: el.dataset.v}});
+    S.book.book.shelf = el.dataset.v; S.books = null; render(); toast("改成「" + SHELF[el.dataset.v] + "」");
+  }),
+  "shelf-filter": el => { S.shelfFilter = el.dataset.v; render(); },
   "cam-open": () => CAM.open(),
   "cam-close": () => CAM.close(),
   "cam-shot": () => CAM.shot(),
@@ -290,7 +293,6 @@ const ACT = {
     await loadBook();
   }),
   "esrc": el => evalSourceSheet(el.dataset.n),
-  "wish-to-read": () => act("books", async () => { await api("/books/" + S.sub.id, {method: "PATCH", json: {shelf: "read"}}); S.books = null; S.shelf = "read"; toast("移到我的書了，開始記筆記吧"); await loadBook(); }),
   "pick-book": el => { S.bookTarget = el.dataset.id ? Number(el.dataset.id) : 0; $("#pick-book").value = ""; $("#pick-book").click(); },
   "pick-photo": () => { $("#pick-photo").value = ""; $("#pick-photo").click(); },
   "note-new": () => noteSheet({}),
@@ -458,6 +460,7 @@ document.addEventListener("change", async e => {
     closeSheet();
     if (!S.sub && !["books", "mybooks"].includes(S.view)) go("books");
   }
+  if (el.id === "w-eval"){ const nb = $("#w-note-box"); if (nb) nb.hidden = !el.checked; }
   if ((el.id === "pick-cover" || el.id === "pick-cover-lib") && el.files[0]) coverDone(identifyCover(el.files[0]));
   if (el.id === "pick-evid" && el.files[0]){
     const box = $("#evid-text"), prev = box ? box.value : "";

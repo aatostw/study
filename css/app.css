@@ -414,3 +414,11 @@ h1,h2{color:var(--primary-text)}
 .rv-n{flex:none;width:28px;height:28px;border-radius:9px;background:var(--yellow);display:grid;place-items:center;font:700 14px var(--font-en);color:#2B2520;margin-top:2px}
 .rv-text{font-size:15px;line-height:1.75}
 .list-row.rv-q .t b{white-space:normal;overflow:visible;text-overflow:clip}
+
+/* ---------- 書的狀態、評估卡 ---------- */
+.hero .shelf-seg{background:rgba(255,255,255,.16);padding:3px;border-radius:999px;gap:2px;width:auto}
+.hero .shelf-seg button{color:rgba(255,255,255,.85);padding:5px 12px;font-size:13px;border-radius:999px;background:none;border:0;box-shadow:none}
+.hero .shelf-seg button[aria-pressed="true"]{background:#fff;color:var(--primary-text);font-weight:700}
+.check{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:14px;background:var(--field);cursor:pointer}
+.check input{width:20px;height:20px;margin-top:2px;flex:none;accent-color:var(--primary)}
+.check > span{display:flex;flex-direction:column;gap:2px}

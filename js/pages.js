@@ -74,22 +74,27 @@ function jobCard(job){
 function renderBook(){
   const back = '<button class="btn ghost back" data-act="back">' + ICON.back + ({ask: "助理", mybooks: "我的書"}[S.view] || "書櫃") + "</button>";
   if (!S.book || S.book.book.id !== S.sub.id) return back + loading();
-  if (S.book.book.shelf === "wish") return renderWishBook();
   const {book: b, notes, job} = S.book;
-  const live = (S.jobs || []).find(j => j.ref_id === b.id && (j.kind === "bookfile" || j.kind === "analyze") && j.status !== "done") || job;
-  let html = back + '<section class="card hero"><div class="row between"><div class="label">書</div>' + starBtn("book", b.id, b.starred) + "</div><h1>" + esc(b.title) + "</h1>" +
+  const jobs = S.jobs || [];
+  const live = jobs.find(j => j.ref_id === b.id && (j.kind === "bookfile" || j.kind === "analyze") && j.status !== "done") || (job && job.kind !== "evaluate" ? job : null);
+  const evLive = jobs.find(j => j.ref_id === b.id && j.kind === "evaluate" && j.status !== "done") || (job && job.kind === "evaluate" ? job : null);
+  const sh = b.shelf || "reading";
+  let html = back + '<section class="card hero"><div class="row between"><div class="seg shelf-seg" role="group" aria-label="狀態">' +
+    ["wish", "reading", "done"].map(v => '<button data-act="shelf-set" data-v="' + v + '" aria-pressed="' + (sh === v) + '">' + SHELF[v] + "</button>").join("") + "</div>" +
+    starBtn("book", b.id, b.starred) + "</div><h1>" + esc(b.title) + "</h1>" +
     (b.author ? '<div class="sub">' + esc(b.author) + "</div>" : "") +
     '<div class="row wrap"><span class="chip">' + notes.length + " 則筆記</span>" +
-    (b.file_name ? '<span class="chip">原文：' + esc(b.file_name) + "</span>" : "") + "</div></section>";
+    (b.file_name ? '<span class="chip">原文：' + esc(b.file_name) + "</span>" : "") + (b.isbn ? '<span class="chip en">ISBN ' + esc(b.isbn) + "</span>" : "") + "</div></section>";
   html += '<div class="row wrap"><button class="btn grow" data-act="note-new">' + ICON.plus + "記一則筆記</button>" +
     '<button class="btn soft" data-act="pick-photo">' + ICON.camera + "拍照</button></div>";
   html += '<div class="row wrap"><button class="btn soft sm" data-act="pick-book" data-id="' + b.id + '">' + ICON.upload + (b.file_name ? "換原文檔" : "上傳原文 PDF／EPUB") + "</button>" +
-    '<button class="btn soft sm" data-act="analyze" data-id="' + b.id + '">' + ICON.spark + (b.analysis ? "重新分析" : "AI 分析") + "</button>" +
+    '<button class="btn soft sm" data-act="analyze" data-id="' + b.id + '">' + ICON.spark + (b.analysis ? "重新分析筆記" : "AI 分析筆記") + "</button>" +
     '<button class="btn soft sm" data-act="book-export" data-id="' + b.id + '">' + ICON.down + "匯出</button>" +
     '<button class="btn ghost sm" data-act="book-edit">編輯</button></div>';
   html += uploadsHTML("book");
   if (S.busy.ocr) html += '<div class="note"><div class="row"><span class="spinner"></span>正在辨識照片裡的文字…</div></div>';
   if (live && live.status !== "done") html += jobCard(live);
+  html += evalSection(b, evLive && evLive.status !== "done" ? evLive : null);
   if (b.analysis) html += analysisHTML(b.analysis);
   html += '<section class="card"><div class="label">只問這本書</div><div class="row"><input class="input grow" id="book-q" placeholder="這本書怎麼談…" data-draft="bookq" value="' + esc(S.ask.bookDraft || "") + '">' +
     '<button class="btn" data-act="ask-book"' + (S.busy.askBook ? " disabled" : "") + ">" + (S.busy.askBook ? '<span class="spinner"></span>' : "問") + "</button></div>" +
@@ -108,7 +113,7 @@ function noteHTML(n){
     '<div class="acts"><button class="btn ghost sm" data-act="note-edit" data-id="' + n.id + '">' + ICON.edit + '編輯</button><button class="btn ghost sm" data-act="note-del" data-id="' + n.id + '">' + ICON.trash + "刪除</button></div></div>";
 }
 function analysisHTML(a){
-  let html = '<section class="card" data-read="AI 分析"><div class="row between no-read"><div class="label">AI 分析</div>' + readBtn() + "</div>";
+  let html = '<section class="card" data-read="AI 分析"><div class="row between no-read"><div class="label">AI 分析（你的筆記）</div>' + readBtn() + "</div>";
   if (a.summary) html += '<p style="margin:0;line-height:1.75">' + esc(a.summary) + "</p>";
   if ((a.themes || []).length) html += '<div class="stack">' + a.themes.map(t => '<div class="sec"><h3>' + esc(t.title) + '</h3><div class="small" style="line-height:1.7">' + esc(t.explain || "") + "</div></div>").join("") + "</div>";
   if ((a.connections || []).length){

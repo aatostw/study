@@ -149,11 +149,11 @@ async def book_add(request: Request):
         title, author = info.get("title") or "", author or info.get("author") or ""
     if not title:
         raise Bad("請填書名" + ("（這個 ISBN 查不到書名）" if isbn else ""))
-    shelf = "wish" if b.get("shelf") == "wish" else "read"
+    shelf = b.get("shelf") if b.get("shelf") in ("wish", "reading", "done") else "wish"
     r = db.one("INSERT INTO books (title, author, isbn, shelf, wish_note) VALUES (%s, %s, %s, %s, %s) RETURNING *",
                (title, author, isbn, shelf, s(b.get("wish_note"), 1000)))
     out = {"ok": True, "book": r}
-    if shelf == "wish" and b.get("evaluate", True):
+    if b.get("evaluate"):
         out["job"] = jobs.add("evaluate", r["id"], "評估《%s》" % title)
     return out
 
@@ -213,7 +213,7 @@ async def book_edit(bid: int, request: Request):
     _book(bid)
     b = await body_json(request)
     cur = _book(bid)
-    shelf = b.get("shelf") if b.get("shelf") in ("read", "wish") else cur["shelf"]
+    shelf = b.get("shelf") if b.get("shelf") in ("wish", "reading", "done") else cur["shelf"]
     db.run("UPDATE books SET title = COALESCE(NULLIF(%s, ''), title), author = %s, isbn = %s, wish_note = %s, shelf = %s, updated_at = now() WHERE id = %s",
            (s(b.get("title"), 200), s(b.get("author", cur["author"]), 200), re.sub(r"[^0-9Xx]", "", s(b.get("isbn", cur["isbn"]), 20)),
             s(b.get("wish_note", cur["wish_note"]), 1000), shelf, bid))
@@ -488,7 +488,7 @@ def create_from_file(path, name, kind, meta):
     if bid:
         b = _book(bid)
     else:
-        b = db.one("INSERT INTO books (title, author) VALUES (%s, %s) RETURNING *",
+        b = db.one("INSERT INTO books (title, author, shelf) VALUES (%s, %s, 'reading') RETURNING *",
                    (s(meta.get("title"), 200) or os.path.splitext(name)[0], s(meta.get("author"), 200)))
     dest = os.path.join(config.BOOK_DIR, "book-%d%s" % (b["id"], ext))
     if b.get("file_path") and os.path.isfile(b["file_path"]) and b["file_path"] != dest:

@@ -178,3 +178,25 @@ CREATE TABLE IF NOT EXISTS reviews (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- 書的狀態：想讀 → 在讀 → 讀完（以前的 'read' 改叫 'reading'）
+UPDATE books SET shelf = 'reading' WHERE shelf = 'read';
+ALTER TABLE books ALTER COLUMN shelf SET DEFAULT 'wish';
+-- 想讀的書：記了第一則筆記、或上傳了原文，自動變「在讀」
+CREATE OR REPLACE FUNCTION book_auto_reading() RETURNS trigger AS $$
+BEGIN
+  IF TG_TABLE_NAME = 'notes' THEN
+    IF NEW.book_id IS NOT NULL THEN
+      UPDATE books SET shelf = 'reading' WHERE id = NEW.book_id AND shelf = 'wish';
+    END IF;
+    RETURN NEW;
+  END IF;
+  IF NEW.file_name <> '' AND COALESCE(OLD.file_name, '') = '' AND NEW.shelf = 'wish' THEN
+    NEW.shelf := 'reading';
+  END IF;
+  RETURN NEW;
+END $$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS notes_auto_reading ON notes;
+CREATE TRIGGER notes_auto_reading AFTER INSERT ON notes FOR EACH ROW EXECUTE FUNCTION book_auto_reading();
+DROP TRIGGER IF EXISTS books_auto_reading ON books;
+CREATE TRIGGER books_auto_reading BEFORE UPDATE OF file_name ON books FOR EACH ROW EXECUTE FUNCTION book_auto_reading();

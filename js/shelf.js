@@ -28,8 +28,13 @@ function bookRow(b, i){
   const bits = [b.notes + " 則筆記"];
   if (b.file_name) bits.push(b.status === "ready" ? (b.pages ? "原文 " + b.pages + (b.file_name.toLowerCase().endsWith(".epub") ? " 章" : " 頁") : "原文") : b.status === "error" ? "原文讀取失敗" : "原文處理中");
   if (b.analyzed) bits.push("已分析");
+  const busy = b.eval_status === "queued" || b.eval_status === "running";
+  if (busy) bits.unshift("評估中…");
+  else if (b.verdict && VERDICT[b.verdict]) bits.unshift((LIGHT[b.light] ? LIGHT[b.light][2] + " " : "") + VERDICT[b.verdict][0]);
+  const sh = b.shelf || "reading";
   return '<button class="list-row" data-act="open-book" data-id="' + b.id + '"><span class="ic ' + COLS[i % 3] + '">' + esc((b.title || "?").slice(0, 1)) + '</span><span class="t"><b>' + (b.starred ? "★ " : "") + esc(b.title) +
-    '</b><span class="sub">' + esc(b.author ? b.author + " · " : "") + bits.join(" · ") + '</span></span><span class="chev">›</span></button>';
+    '</b><span class="sub">' + esc(b.author ? b.author + " · " : "") + bits.join(" · ") + "</span></span>" +
+    (sh !== "reading" ? '<span class="chip ' + (sh === "wish" ? "yellow" : "green") + '">' + SHELF[sh] + "</span>" : '<span class="chev">›</span>') + "</button>";
 }
 function noteRow(n){
   return '<button class="list-row" data-act="open-note" data-id="' + n.id + '"><span class="ic yellow">' + ICON.edit.replace("<svg", '<svg width="20" height="20"') + '</span><span class="t"><b>' + (n.starred ? "★ " : "") + esc(n.title || "（無標題）") +
@@ -54,10 +59,10 @@ function renderShelf(){
   const active = (S.jobs || []).filter(j => j.status === "queued" || j.status === "running");
   if (active.length) html += '<section class="card"><div class="label">電腦正在處理</div><div class="stack">' + active.map(j => '<div class="stack" style="gap:4px"><b class="small">' + esc(j.title) + "</b>" + jobCard(j) + "</div>").join("") + "</div></section>";
   if (!S.books || !S.notes || !S.lectures) return html + loading();
-  const books = S.books.filter(b => (b.shelf || "read") === "read");
+  const books = S.books;
   const stars = books.filter(b => b.starred).map(bookRow).concat(S.notes.filter(n => n.starred).map(noteRow), S.lectures.filter(l => l.starred).map(lectureRow));
   if (stars.length) html += '<section class="card starred"><div class="label">★ 收藏</div><div class="stack">' + stars.join("") + "</div></section>";
-  html += shelfSection("我的書", "mybooks", books.slice(0, 4).map(bookRow), books.length, "還沒有書。按「新增學習」→ 書。");
+  html += shelfSection("我的書", "mybooks", books.slice(0, 4).map(bookRow), books.length, "還沒有書。按「新增學習」→ 書，拍封面或條碼就能認書。");
   html += shelfSection("記事本", "notebook", S.notes.slice(0, 4).map(noteRow), S.notes.length, "隨手記、想法、要朗讀的文字都可以放這裡。");
   html += shelfSection("課程", "lectures", S.lectures.slice(0, 4).map(lectureRow), S.lectures.length, "還沒有課程。按「新增學習」→ 課程，上傳錄音或影片。");
   return html;
@@ -68,9 +73,13 @@ function renderMyBooks(){
   let html = backBtn("書櫃", "books") + '<div class="row"><button class="btn grow" data-act="book-new">' + ICON.plus + "新增一本書</button>" +
     '<button class="btn soft" data-act="pick-book" data-id="">' + ICON.upload + "上傳 PDF／EPUB</button></div>" + uploadsHTML("book");
   if (!S.books) return html + loading();
-  const mine = S.books.filter(b => (b.shelf || "read") === "read");
-  if (!mine.length) return html + '<section class="card"><div class="empty">書櫃還是空的。<br>新增一本書開始記筆記，或直接上傳 PDF／EPUB，原文也會進知識庫。</div></section>';
-  return html + '<section class="card"><div class="label">我的書（' + mine.length + '）</div><div class="stack">' + mine.map(bookRow).join("") + "</div></section>";
+  const f = S.shelfFilter || "all";
+  const n = v => S.books.filter(b => (b.shelf || "reading") === v).length;
+  html += '<div class="seg" role="group" aria-label="篩選">' + [["all", "全部", S.books.length], ["wish", "想讀", n("wish")], ["reading", "在讀", n("reading")], ["done", "讀完", n("done")]].map(o =>
+    '<button data-act="shelf-filter" data-v="' + o[0] + '" aria-pressed="' + (f === o[0]) + '">' + o[1] + (o[2] ? " " + o[2] : "") + "</button>").join("") + "</div>";
+  const mine = f === "all" ? S.books : S.books.filter(b => (b.shelf || "reading") === f);
+  if (!mine.length) return html + '<section class="card"><div class="empty">' + (f === "all" ? "書櫃還是空的。<br>新增一本書：拍封面或條碼就能認書，可以先評估值不值得讀，也可以直接記筆記。" : "這裡還沒有書。") + "</div></section>";
+  return html + '<section class="card"><div class="stack">' + mine.map(bookRow).join("") + "</div></section>";
 }
 
 /* ---------- 記事本 ---------- */
