@@ -30,7 +30,9 @@ function renderWishList(){
 
 function wishSheet(pre){
   pre = pre || {};
-  openSheet('<h2>加入想讀</h2><div class="small muted">填書名就好，作者和 ISBN 有的話更準。也可以拍封面、條碼，或從相簿選現有的照片。</div>' +
+  openSheet('<h2>加入想讀</h2><div class="small muted">填書名就好，作者和 ISBN 有的話更準。也可以拍封面、條碼，或從相簿選照片。</div>' +
+    (S.busy.identify ? '<div class="btn soft block" aria-busy="true"><span class="spinner"></span>辨識中…</div>'
+      : '<button class="btn soft block" data-act="cam-open">' + ICON.camera + "拍封面／ISBN 條碼</button>") +
     (S.busy.identify ? '<div class="btn soft block" aria-busy="true"><span class="spinner"></span>辨識中…</div>'
       : '<div class="row"><button class="btn soft grow" data-act="pick-cover">' + ICON.camera + '拍照</button><button class="btn soft grow" data-act="pick-cover" data-lib="1">🖼️ 從相簿選</button></div>') +
     '<div class="field"><label for="w-title">書名</label><input class="input" id="w-title" value="' + esc(pre.title || "") + '" placeholder="被討厭的勇氣"></div>' +
@@ -141,4 +143,81 @@ async function identifyCover(file){
   } catch (e) {}
   const blob = await shrinkImage(file, 1600);
   return (await api("/identify", {method: "POST", body: blob, headers: {"Content-Type": "image/jpeg"}})).book;
+}
+
+/* ---------- 相機：全螢幕取景，Android 對準條碼會自動認 ---------- */
+const CAM = {
+  stream: null, timer: 0, busy: false,
+  async open(){
+    S.wishKeep = wishForm();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ $("#pick-cover").value = ""; return $("#pick-cover").click(); }
+    const box = document.createElement("div");
+    box.id = "cam";
+    box.innerHTML = '<div class="cam-top"><button class="btn ghost back" data-act="cam-close" aria-label="返回">' + ICON.back + '</button><b>拍封面／ISBN</b></div>' +
+      '<div class="cam-view"><video playsinline muted autoplay></video>' +
+      '<div class="cam-frame"><i></i><i></i><i></i><i></i></div>' +
+      '<div class="cam-hint">' + ("BarcodeDetector" in window ? "對準條碼會自動辨識，或拍下封面" : "拍下封面或條碼") + "</div>" +
+      '<div class="cam-bar"><button class="cam-lib" data-act="cam-lib"><span>🖼️</span>相簿</button>' +
+      '<button class="cam-shot" data-act="cam-shot" aria-label="拍照"><span></span></button><span class="cam-lib ghost"></span></div></div>';
+    document.body.appendChild(box);
+    try {
+      CAM.stream = await navigator.mediaDevices.getUserMedia({audio: false, video: {facingMode: {ideal: "environment"}, width: {ideal: 1920}, height: {ideal: 1080}}});
+      const v = box.querySelector("video");
+      v.srcObject = CAM.stream;
+      await v.play().catch(() => {});
+      CAM.scan(v);
+    } catch (e) {
+      CAM.close();
+      toast("打不開相機，改用手機的拍照");
+      $("#pick-cover").value = ""; $("#pick-cover").click();
+    }
+  },
+  scan(v){
+    if (!("BarcodeDetector" in window)) return;
+    let bd;
+    try { bd = new BarcodeDetector({formats: ["ean_13"]}); } catch (e) { return; }
+    const tick = async () => {
+      if (!CAM.stream || CAM.busy) return;
+      try {
+        const codes = await bd.detect(v);
+        const isbn = codes.map(c => c.rawValue).find(x => /^97[89]\d{10}$/.test(x));
+        if (isbn){ if (navigator.vibrate) navigator.vibrate(60); CAM.close(); return coverDone(api("/lookup?isbn=" + isbn).then(r => Object.assign({isbn}, r.book))); }
+      } catch (e) {}
+      CAM.timer = setTimeout(tick, 350);
+    };
+    CAM.timer = setTimeout(tick, 500);
+  },
+  shot(){
+    const v = $("#cam video");
+    if (!v || !v.videoWidth) return;
+    CAM.busy = true;
+    const k = Math.min(1, 1600 / Math.max(v.videoWidth, v.videoHeight));
+    const c = document.createElement("canvas");
+    c.width = Math.round(v.videoWidth * k); c.height = Math.round(v.videoHeight * k);
+    c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+    c.toBlob(b => { CAM.close(); coverDone(identifyCover(b)); }, "image/jpeg", 0.88);
+  },
+  close(){
+    clearTimeout(CAM.timer);
+    if (CAM.stream) CAM.stream.getTracks().forEach(t => t.stop());
+    CAM.stream = null; CAM.busy = false;
+    const box = $("#cam"); if (box) box.remove();
+  },
+};
+
+function wishForm(){
+  const g = id => ($(id) ? $(id).value : "");
+  return {title: g("#w-title"), author: g("#w-author"), isbn: g("#w-isbn"), wish_note: g("#w-note")};
+}
+
+/* 辨識完把結果填回「加入想讀」 */
+async function coverDone(promise){
+  const keep = S.wishKeep || wishForm();
+  S.busy.identify = true; wishSheet(keep);
+  try {
+    const r = await promise;
+    S.busy.identify = false;
+    wishSheet({title: r.title || keep.title, author: r.author || keep.author, isbn: r.isbn || keep.isbn, wish_note: keep.wish_note});
+    toast(r.title ? "認出來了，確認一下" : r.isbn ? "讀到 ISBN，但查不到書名，請手動輸入書名" : "沒認出來，請拍清楚一點或手動輸入");
+  } catch (err) { S.busy.identify = false; wishSheet(keep); toast(errMsg(err)); }
 }

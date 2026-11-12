@@ -211,7 +211,10 @@ const ACT = {
     if (!body.title && !body.isbn) return toast("請填書名或 ISBN");
     act("wishc", async () => { const r = await api("/books", {json: body}); closeSheet(); S.books = null; S.shelf = "wish"; pollJobs(true); go("books", {type: "book", id: r.book.id}); });
   },
-  "pick-cover": el => { const i = $(el.dataset.lib ? "#pick-cover-lib" : "#pick-cover"); i.value = ""; i.click(); },
+  "cam-open": () => CAM.open(),
+  "cam-close": () => CAM.close(),
+  "cam-shot": () => CAM.shot(),
+  "cam-lib": () => { CAM.close(); $("#pick-cover-lib").value = ""; $("#pick-cover-lib").click(); },
   "evaluate": el => act("evaluate", async () => { await api("/books/" + el.dataset.id + "/evaluate", {method: "POST"}); toast("開始評估，大約 1～3 分鐘"); pollJobs(true); await loadBook(); }),
   "evid-open": () => evidenceSheet(S.book.book),
   "pick-evid": () => { $("#pick-evid").value = ""; $("#pick-evid").click(); },
@@ -392,16 +395,7 @@ document.addEventListener("change", async e => {
     Up.start(f, "book", S.bookTarget ? {book_id: S.bookTarget} : {title: f.name.replace(/\.[^.]+$/, "")});
     if (!S.sub && S.view !== "books") go("books");
   }
-  if ((el.id === "pick-cover" || el.id === "pick-cover-lib") && el.files[0]){
-    const keep = {title: $("#w-title").value, author: $("#w-author").value, isbn: $("#w-isbn").value, wish_note: $("#w-note").value};
-    S.busy.identify = true; wishSheet(keep);
-    try {
-      const r = await identifyCover(el.files[0]);
-      S.busy.identify = false;
-      wishSheet({title: r.title || keep.title, author: r.author || keep.author, isbn: r.isbn || keep.isbn, wish_note: keep.wish_note});
-      toast(r.title ? "認出來了，確認一下" : r.isbn ? "讀到 ISBN，但查不到書名，請手動輸入書名" : "沒認出來，請拍清楚一點或手動輸入");
-    } catch (err) { S.busy.identify = false; wishSheet(keep); toast(errMsg(err)); }
-  }
+  if ((el.id === "pick-cover" || el.id === "pick-cover-lib") && el.files[0]) coverDone(identifyCover(el.files[0]));
   if (el.id === "pick-evid" && el.files[0]){
     const box = $("#evid-text"), prev = box ? box.value : "";
     S.busy.evid = true; evidenceSheet({user_evidence: prev});
@@ -425,6 +419,7 @@ document.addEventListener("change", async e => {
   }
 });
 document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("#cam")){ CAM.close(); return; }
   if (e.key === "Escape" && S.dd){ S.dd = null; render(); return; }
   if (e.key === "Escape" && S.sheet) closeSheet();
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing && (e.target.id === "book-q")){ e.preventDefault(); ACT["ask-book"](); }

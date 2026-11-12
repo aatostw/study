@@ -304,3 +304,24 @@ h1,h2{color:var(--primary-text)}
 .card.verdict.red{border-left-color:var(--danger)}
 .cite.k{background:var(--primary-soft);color:var(--primary-text)}
 .cite.u{background:var(--green-soft);color:var(--green-text)}
+
+/* ---------- 相機 ---------- */
+#cam{position:fixed;inset:0;z-index:300;background:#000;display:flex;flex-direction:column}
+.cam-top{display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;background:var(--surface);font-size:18px;letter-spacing:.06em}
+.cam-top .back{border:1px solid var(--line);border-radius:14px;padding:8px 12px}
+.cam-view{position:relative;flex:1;overflow:hidden}
+.cam-view video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cam-frame{position:absolute;left:13%;right:13%;top:9%;bottom:30%;pointer-events:none}
+.cam-frame i{position:absolute;width:44px;height:44px;border:0 solid #fff}
+.cam-frame i:nth-child(1){left:0;top:0;border-width:4px 0 0 4px}
+.cam-frame i:nth-child(2){right:0;top:0;border-width:4px 4px 0 0}
+.cam-frame i:nth-child(3){left:0;bottom:0;border-width:0 0 4px 4px}
+.cam-frame i:nth-child(4){right:0;bottom:0;border-width:0 4px 4px 0}
+.cam-hint{position:absolute;left:0;right:0;top:calc(70% + 12px);text-align:center;color:#fff;font-size:14px;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.cam-bar{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:space-between;padding:28px 36px calc(env(safe-area-inset-bottom) + 30px);background:linear-gradient(transparent,rgba(0,0,0,.55))}
+.cam-shot{width:84px;height:84px;border-radius:30px;border:5px solid #fff;background:transparent;padding:5px;display:grid}
+.cam-shot span{border-radius:22px;background:var(--primary)}
+.cam-shot:active span{transform:scale(.9)}
+.cam-lib{width:60px;display:grid;justify-items:center;gap:4px;border:0;background:none;color:#fff;font-size:12px}
+.cam-lib span{width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,.22);display:grid;place-items:center;font-size:24px}
+.cam-lib.ghost{visibility:hidden}
