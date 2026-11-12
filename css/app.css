@@ -392,3 +392,18 @@ h1,h2{color:var(--primary-text)}
 .assist-top .chip-btn{padding:7px 12px;font-size:13.5px}
 .assist-bar{flex:none;margin-top:-6px}
 .assist-bar .small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+
+/* ---------- 語音模式 ---------- */
+.mode-seg{display:flex;background:var(--field);border-radius:999px;padding:3px;gap:2px;flex:none}
+.mode-seg button{border:0;background:none;border-radius:999px;padding:5px 12px;font-size:13px;color:var(--muted)}
+.mode-seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.composer.voice{align-items:center}
+.voice-box{display:flex;flex-direction:column;align-items:center;gap:6px;padding:4px 0}
+.mic{width:76px;height:76px;border-radius:50%;border:0;background:var(--primary);color:#fff;display:grid;place-items:center;box-shadow:0 6px 18px color-mix(in srgb,var(--primary) 40%,transparent);transition:transform .12s}
+.mic svg{width:34px;height:34px}
+.mic:active{transform:scale(.92)}
+.mic.rec{background:var(--danger);animation:pulse 1.4s infinite}
+.mic.speak{background:var(--green)}
+.mic:disabled{opacity:.85}
+@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--danger) 55%,transparent)}70%{box-shadow:0 0 0 18px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.voice-label{font-size:13.5px;color:var(--muted);text-align:center}

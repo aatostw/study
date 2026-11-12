@@ -5,6 +5,8 @@
 S.chat = null;            // {id, title, messages:[]}
 S.chats = null;           // 對話紀錄
 S.chatPending = null;     // 送出中的那句話
+S.voice = lsGet("voice") === "1";   // 語音模式
+S.rec = {state: "idle"};  // idle / rec / stt
 
 async function loadChats(){ S.chats = (await api("/chats")).chats; renderSoon(); }
 async function openChat(id){
@@ -21,7 +23,8 @@ function renderAssist(){
     '<button class="chip-btn" data-act="wish-new">📖 評估一本書</button>' +
     '<button class="chip-btn" data-act="assist" data-v="wish">📚 想讀清單' + (nWish ? "（" + nWish + "）" : "") + "</button></div>" +
     "</div></div>" +
-    '<div class="row between assist-bar"><span class="small muted">' + esc(S.chat ? S.chat.title : "新對話") + "</span>" +
+    '<div class="row between assist-bar"><div class="mode-seg" role="group" aria-label="模式">' +
+      '<button data-act="voice-mode" data-v="0" aria-pressed="' + !S.voice + '">⌨️ 文字</button><button data-act="voice-mode" data-v="1" aria-pressed="' + S.voice + '">🎙️ 語音</button></div>' +
     '<span class="row"><button class="btn ghost sm" data-act="chat-history">🕘 紀錄</button>' +
     (S.chat ? '<button class="btn ghost sm" data-act="chat-new">' + ICON.plus + "新對話</button>" : "") + "</span></div>";
 
@@ -37,8 +40,13 @@ function renderAssist(){
     html += "</div>";
   }
   if (S.err.chat) html += '<div class="err">' + esc(S.err.chat) + "</div>";
-  html += '<div class="composer"><div class="scope-mini">' + [["all", "全部"], ["books", "書和筆記"], ["lectures", "課程"]].map(o =>
-      '<button data-act="ask-scope" data-v="' + o[0] + '" aria-pressed="' + (S.ask.scope === o[0]) + '">' + o[1] + "</button>").join("") + "</div>" +
+  const scope = '<div class="scope-mini">' + [["all", "全部"], ["books", "書和筆記"], ["lectures", "課程"]].map(o =>
+      '<button data-act="ask-scope" data-v="' + o[0] + '" aria-pressed="' + (S.ask.scope === o[0]) + '">' + o[1] + "</button>").join("") + "</div>";
+  if (S.voice){
+    html += '<div class="composer voice">' + scope + voiceHTML() + "</div>";
+    return html;
+  }
+  html += '<div class="composer">' + scope +
     '<div class="row"><textarea class="input" id="chat-in" rows="1" placeholder="' + (msgs.length ? "接著問…" : "問你讀過的書、上過的課…") + '" data-draft="chat">' + esc(S.chatDraft || "") + "</textarea>" +
     '<button class="send" data-act="chat-send" aria-label="送出"' + (S.chatPending ? " disabled" : "") + ">" +
     (S.chatPending ? '<span class="spinner" style="width:18px;height:18px;border-color:#fff4;border-top-color:#fff"></span>' : '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 20.4l17.5-7.5c.8-.4.8-1.5 0-1.8L3.4 3.6c-.7-.3-1.4.3-1.3 1l1.4 6.3 9 1.1-9 1.1-1.4 6.3c-.1.7.6 1.3 1.3 1z"/></svg>') + "</button></div></div>";
@@ -85,4 +93,74 @@ function chatHistorySheet(){
     (!S.chats ? '<div class="row muted"><span class="spinner"></span>載入中…</div>' : !list.length ? '<div class="empty">還沒有對話。</div>'
       : '<div class="stack">' + list.map(c => '<div class="row"><button class="list-row grow" data-act="chat-open" data-id="' + c.id + '"><span class="t"><b>' + esc(c.title || "（無標題）") + '</b><span class="sub">' + fmtDate(c.updated_at) + " · " + c.n + " 則</span></span></button>" +
         '<button class="icon-btn" data-act="chat-del" data-id="' + c.id + '" aria-label="刪除">' + ICON.trash + "</button></div>").join("") + "</div>"));
+}
+
+/* =========================================================
+   語音模式：點一下開始說、再點一下送出 → 電腦聽寫 → 回答 → 用你的聲音唸
+   回答的文字和文字模式一模一樣，所以音檔也共用（電腦會快取）
+   ========================================================= */
+const MIC = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="8.5" y="2.5" width="7" height="12" rx="3.5"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+function voiceHTML(){
+  const r = S.rec, t = S.tts;
+  let state = "idle", label = "點一下開始說";
+  if (r.state === "rec"){ state = "rec"; label = "正在聽 " + fmtT((Date.now() - r.start) / 1000) + "　說完再點一下"; }
+  else if (r.state === "stt"){ state = "busy"; label = "聽寫中…"; }
+  else if (S.chatPending){ state = "busy"; label = "思考中…"; }
+  else if (t.playing && S.voiceSpeaking){ state = "speak"; label = "正在唸　點一下打斷並開始說"; }
+  return '<div class="voice-box"><button class="mic ' + state + '" data-act="mic" aria-label="' + label + '"' + (state === "busy" ? " disabled" : "") + ">" +
+    (state === "busy" ? '<span class="spinner" style="width:28px;height:28px;border-color:#fff4;border-top-color:#fff"></span>' : MIC) + "</button>" +
+    '<div class="voice-label" id="voice-label">' + label + "</div>" +
+    (r.state === "rec" ? '<button class="btn ghost sm" data-act="mic-cancel">取消</button>' : "") + "</div>";
+}
+
+const REC = {
+  mr: null, chunks: [], stream: null, timer: 0, cancel: false,
+  async start(){
+    TTSP.stop(); S.voiceSpeaking = false;
+    if (!navigator.mediaDevices || !window.MediaRecorder) return toast("這個瀏覽器不能錄音");
+    try { REC.stream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: true}}); }
+    catch (e) { return toast("沒有麥克風權限：請在瀏覽器允許使用麥克風"); }
+    const type = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"].find(x => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(x)) || "";
+    REC.mr = new MediaRecorder(REC.stream, type ? {mimeType: type} : undefined);
+    REC.chunks = []; REC.cancel = false;
+    REC.mr.ondataavailable = e => { if (e.data && e.data.size) REC.chunks.push(e.data); };
+    REC.mr.onstop = () => REC.done();
+    REC.mr.start();
+    S.rec = {state: "rec", start: Date.now()}; render();
+    if (navigator.vibrate) navigator.vibrate(30);
+    clearInterval(REC.timer);
+    REC.timer = setInterval(() => {
+      const l = $("#voice-label");
+      if (l && S.rec.state === "rec") l.textContent = "正在聽 " + fmtT((Date.now() - S.rec.start) / 1000) + "　說完再點一下";
+      if (Date.now() - S.rec.start > 180000) REC.stop();          // 最多 3 分鐘
+    }, 500);
+  },
+  stop(cancel){
+    clearInterval(REC.timer);
+    REC.cancel = !!cancel;
+    if (REC.mr && REC.mr.state !== "inactive") REC.mr.stop();
+    if (REC.stream) REC.stream.getTracks().forEach(t => t.stop());
+  },
+  async done(){
+    const blob = new Blob(REC.chunks, {type: (REC.mr && REC.mr.mimeType) || "audio/webm"});
+    REC.mr = null; REC.stream = null;
+    if (REC.cancel || blob.size < 1500){ S.rec = {state: "idle"}; render(); if (!REC.cancel) toast("太短了，再說一次"); return; }
+    S.rec = {state: "stt"}; render();
+    try {
+      const r = await api("/stt", {method: "POST", body: blob, headers: {"Content-Type": blob.type.split(";")[0] || "audio/webm"}});
+      S.rec = {state: "idle"};
+      await chatSend(r.text);
+      speakLast();
+    } catch (e) { S.rec = {state: "idle"}; render(); if (!e.relogin) toast(errMsg(e)); }
+  }
+};
+
+/* 語音模式：回答出來就自動唸（跳過引用編號、出處、按鈕） */
+function speakLast(){
+  if (!S.voice || S.view !== "ask") return;
+  const boxes = document.querySelectorAll(".msg.ai .bubble[data-read]");
+  const box = boxes[boxes.length - 1];
+  if (!box) return;
+  S.voiceSpeaking = true;
+  readAloud(readableText(box), "助理的回答");
 }

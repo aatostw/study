@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """HTTP API：只聽 127.0.0.1，只接受帶著電腦密碼（X-Study-Key）的請求，也就是 Cloudflare Worker。"""
+import asyncio
 import hmac
 import json
 import os
@@ -727,9 +728,34 @@ async def chat_send(request: Request):
     if not text:
         raise Bad("請輸入訊息")
     try:
-        return dict(chat.send(int(b.get("chat_id") or 0) or None, text, s(b.get("scope"), 40) or "all"), ok=True)
+        r = await asyncio.to_thread(chat.send, int(b.get("chat_id") or 0) or None, text, s(b.get("scope"), 40) or "all")
+        return dict(r, ok=True)
     except ValueError as e:
         raise Bad(str(e), 404)
+
+
+@app.post("/stt")
+async def stt(request: Request):
+    """語音模式：手機錄的一小段話 → 文字"""
+    data = await request.body()
+    if not data or len(data) > 25 * 1024 * 1024:
+        raise Bad("錄音是空的或太長了（一次最多約 3 分鐘）")
+    ext = {"audio/webm": ".webm", "audio/ogg": ".ogg", "audio/mp4": ".m4a", "audio/mpeg": ".mp3", "audio/wav": ".wav"}.get(
+        request.headers.get("content-type", "").split(";")[0].strip(), ".webm")
+    os.makedirs(os.path.join(config.DATA_DIR, "tmp"), exist_ok=True)
+    path = os.path.join(config.DATA_DIR, "tmp", "stt-%d%s" % (int(time.time() * 1000), ext))
+    with open(path, "wb") as f:
+        f.write(data)
+    try:
+        text = await asyncio.to_thread(engines.dictate, path)
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+    if not text:
+        raise Bad("沒聽到內容，再說一次看看")
+    return {"ok": True, "text": text}
 
 
 @app.delete("/chats/{cid}")

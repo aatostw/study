@@ -205,3 +205,32 @@ def prepare_audio(src, wav_out, m4a_out):
     _run([ff, "-y", "-hide_banner", "-loglevel", "error", "-i", src, "-vn", "-ac", "1", "-ar", "16000", wav_out])
     _run([ff, "-y", "-hide_banner", "-loglevel", "error", "-i", src, "-vn", "-ac", "1", "-c:a", "aac", "-b:a", "64k",
           "-movflags", "+faststart", m4a_out])
+
+
+def dictate(src):
+    """助理的語音輸入：一小段錄音 → 文字（台灣繁體）"""
+    if config.FAKE:
+        time.sleep(0.5)
+        return "老子說的無為是什麼意思？"
+    from .textutil import to_trad
+    ff = find_ffmpeg()
+    if not ff:
+        raise RuntimeError("找不到 ffmpeg，沒辦法聽寫。")
+    wav = src + ".wav"
+    try:
+        _run([ff, "-y", "-hide_banner", "-loglevel", "error", "-i", src, "-vn", "-ac", "1", "-ar", "16000", wav])
+        with _asr_lock:
+            model = _load_asr()
+            _asr["last"] = time.time()
+            segments, _ = model.transcribe(wav, language="zh", task="transcribe", beam_size=5, vad_filter=True,
+                                           condition_on_previous_text=False,
+                                           initial_prompt="以下是台灣繁體中文的提問，可能夾雜英文。")
+            text = "".join(s.text.strip() for s in segments)
+            _asr["last"] = time.time()
+        return to_trad(text).strip()
+    finally:
+        for p in (wav,):
+            try:
+                os.remove(p)
+            except OSError:
+                pass

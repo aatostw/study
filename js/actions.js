@@ -163,6 +163,9 @@ const ACT = {
   "assist": el => { S.assist = el.dataset.v || null; render.last = null; render(); $("#main").scrollTop = 0; if (!S.books) loadBooks(); },
   "ask-focus": () => { const q = $("#chat-in"); if (q) q.focus(); },
   "chat-send": () => chatSend(($("#chat-in") || {}).value),
+  "voice-mode": el => { S.voice = el.dataset.v === "1"; lsSet("voice", S.voice ? "1" : null); if (!S.voice && S.rec.state === "rec") REC.stop(true); render(); },
+  "mic": () => { if (S.rec.state === "rec") REC.stop(); else if (S.rec.state === "idle" && !S.chatPending) REC.start(); },
+  "mic-cancel": () => REC.stop(true),
   "chat-example": el => chatSend(el.dataset.q),
   "chat-new": () => { closeSheet(); S.chat = null; S.err.chat = ""; render(); const q = $("#chat-in"); if (q) q.focus(); },
   "chat-history": () => { chatHistorySheet(); loadChats().then(() => { if (S.sheet) chatHistorySheet(); }).catch(() => {}); },
@@ -216,7 +219,7 @@ const ACT = {
     const was = t.playing; TTSP.stop(); TTSP.reset(); t.speed = next; renderMini();
     if (was) TTSP.play(t.i);
   },
-  "tts-close": () => { TTSP.stop(); TTSP.reset(); S.tts.parts = []; S.tts.i = -1; S.err.tts = ""; renderMini(); },
+  "tts-close": () => { S.voiceSpeaking = false; TTSP.stop(); TTSP.reset(); S.tts.parts = []; S.tts.i = -1; S.err.tts = ""; renderMini(); },
   "tts-sheet": () => ttsSheet(),
   "reload": () => { S.err.load = ""; render(); load(); },
   "close-sheet": () => closeSheet(),
