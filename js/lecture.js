@@ -19,7 +19,7 @@ const LANG_NAME = {zh: "中文", en: "英文", auto: "自動"};
 const STATUS = {queued: ["排隊中", ""], processing: ["處理中", "yellow"], ready: ["完成", "green"], error: ["失敗", "red"]};
 
 function renderLectures(){
-  let html = '<section class="card"><div class="label">新增一堂課</div>' +
+  let html = backBtn("書櫃", "books") + '<section class="card"><div class="label">新增一堂課</div>' +
     '<button class="btn block green" data-act="pick-lecture">' + ICON.upload + "上傳錄音或影片</button>" +
     '<div class="small muted">檔案直接傳到你的電腦（分塊上傳，沒有大小限制的困擾）。45 分鐘的課，電腦大約 3～5 分鐘轉好逐字稿。</div>' +
     uploadsHTML("lecture") + "</section>";
@@ -73,13 +73,13 @@ function seek(t){
 }
 
 function renderLecture(){
-  const back = '<button class="btn ghost back" data-act="back">' + ICON.back + "課程</button>";
+  const back = '<button class="btn ghost back" data-act="back">' + ICON.back + (S.view === "lectures" ? "課程" : "書櫃") + "</button>";
   if (!S.lecture || S.lecture.lecture.id !== S.sub.id) return back + loading();
   const {lecture: l, segments, job} = S.lecture;
   const live = (S.jobs || []).find(j => j.ref_id === l.id && (j.kind === "lecture" || j.kind === "resummarize") && j.status !== "done") || job;
   let html = "";
   if (l.audio_path) html += playerHTML(l);
-  html += back + '<section class="card hero green"><div class="label">' + esc(l.course || "未分類") + "</div><h1>" + esc(l.title) + "</h1>" +
+  html += back + '<section class="card hero green"><div class="row between"><div class="label">' + esc(l.course || "未分類") + "</div>" + starBtn("lecture", l.id, l.starred) + "</div><h1>" + esc(l.title) + "</h1>" +
     '<div class="row wrap"><span class="chip">' + fmtDate(l.created_at) + "</span>" + (l.duration ? '<span class="chip">' + fmtDur(l.duration) + "</span>" : "") +
     '<span class="chip">' + LANG_NAME[l.lang] + "</span>" + (l.summary_model ? '<span class="chip">' + esc(l.summary_model) + "</span>" : "") + "</div></section>";
   if (live && live.status !== "done") html += jobCard(live);

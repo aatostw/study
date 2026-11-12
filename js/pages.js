@@ -7,11 +7,15 @@
 async function load(){
   try {
     if (S.sub && S.sub.type === "book") return await loadBook();
+    if (!S.settings) loadSettings().catch(() => {});        // 朗讀要用到語言和速度
     if (S.sub && S.sub.type === "lecture") return await loadLecture();
-    if (S.view === "ask"){ if (!S.books) loadBooks(true); return await loadAsks(); }
-    if (S.view === "books") return await loadBooks();
+    if (S.sub && S.sub.type === "note") return await loadNote();
+    if (S.view === "ask"){ loadBooks(true).then(renderSoon).catch(() => {}); return await loadAsks(); }
+    if (S.view === "books") return await loadShelf();
+    if (S.view === "mybooks") return await loadBooks();
+    if (S.view === "notebook") return await loadNotebook();
     if (S.view === "lectures"){ loadInbox(); return await loadLectures(); }
-    if (S.view === "tts" || S.view === "prefs"){ if (S.view === "prefs") loadStatus().catch(() => {}); return await loadSettings(); }
+    if (S.view === "prefs"){ loadStatus().catch(() => {}); return await loadSettings(); }
   } catch (e) { if (!e.relogin){ S.err.load = errMsg(e); render(); } }
 }
 async function loadAsks(){ S.asks = (await api("/asks?limit=15")).asks; S.err.load = ""; render(); }
@@ -34,8 +38,11 @@ function scopeSeg(cur, act){
   return '<div class="seg" role="group" aria-label="範圍">' + opts.map(o => '<button data-act="' + act + '" data-v="' + o[0] + '" aria-pressed="' + (cur === o[0]) + '">' + o[1] + "</button>").join("") + "</div>";
 }
 function renderAsk(){
-  const a = S.ask;
-  let html = '<section class="card"><div class="label">問你讀過的書、上過的課</div>' +
+  if (S.assist === "wish") return renderWishList();
+  const a = S.ask, nWish = (S.books || []).filter(b => b.shelf === "wish").length;
+  let html = '<div class="chips"><button class="chip-btn" data-act="ask-focus">💬 問我的筆記</button><button class="chip-btn" data-act="wish-new">📖 評估一本書</button>' +
+    '<button class="chip-btn" data-act="assist" data-v="wish">📚 想讀清單' + (nWish ? "（" + nWish + "）" : "") + "</button></div>" +
+    '<section class="card"><div class="label">問你讀過的書、上過的課</div>' +
     '<textarea class="input" id="ask-q" rows="3" placeholder="例如：老子和莊子對「無為」的看法有什麼不同？" data-draft="ask">' + esc(a.draft) + "</textarea>" +
     scopeSeg(a.scope, "ask-scope") +
     '<button class="btn block" data-act="ask"' + (a.busy ? " disabled" : "") + ">" + (a.busy ? '<span class="spinner"></span>正在翻你的筆記…' : "問問看") + "</button>" +
@@ -50,13 +57,13 @@ function renderAsk(){
 }
 function answerHTML(r, ctx){
   const cited = (r.sources || []).filter(s => s.cited), rest = (r.sources || []).filter(s => !s.cited);
-  return '<section class="card"><div class="row between top"><div class="label grow">' + esc(r.question) + '</div>' +
+  return '<section class="card" data-read="助理的回答"><div class="row between top"><div class="label grow no-read">' + esc(r.question) + '</div>' +
     (r.id && ctx === "ask" ? '<button class="icon-btn" data-act="ask-del" data-id="' + r.id + '" aria-label="刪除">' + ICON.trash + "</button>" : "") + "</div>" +
     '<div class="answer rich">' + richHTML(r.answer, ctx) + "</div>" +
-    (r.model ? '<div class="tiny muted">' + esc(r.model) + "</div>" : "") +
-    (cited.length ? '<div class="label">出處</div><div class="stack">' + cited.map(s => srcRow(s, ctx)).join("") + "</div>" : "") +
+    '<div class="row between no-read">' + readBtn() + (r.model ? '<span class="tiny muted">' + esc(r.model) + "</span>" : "") + "</div>" +
+    '<div class="no-read stack">' + (cited.length ? '<div class="label">出處</div><div class="stack">' + cited.map(s => srcRow(s, ctx)).join("") + "</div>" : "") +
     (rest.length ? '<details><summary class="small muted" style="cursor:pointer">其他找到但沒用上的資料（' + rest.length + "）</summary>" +
-      '<div class="stack" style="margin-top:8px">' + rest.map(s => srcRow(s, ctx)).join("") + "</div></details>" : "") + "</section>";
+      '<div class="stack" style="margin-top:8px">' + rest.map(s => srcRow(s, ctx)).join("") + "</div></details>" : "") + "</div></section>";
 }
 function srcRow(s, ctx){
   const kind = {note: "筆記", book: "原文", lecture: "課程"}[s.kind] || "";
@@ -73,24 +80,6 @@ function sourceSheet(s){
 }
 
 /* ---------- 書櫃 ---------- */
-function renderBooks(){
-  if (S.shelf === "wish") return renderWishList();
-  let html = shelfSeg() + '<div class="row"><button class="btn grow" data-act="book-new">' + ICON.plus + "新增一本書</button>" +
-    '<button class="btn soft" data-act="pick-book" data-id="">' + ICON.upload + "上傳 PDF／EPUB</button></div>" + uploadsHTML("book");
-  if (!S.books) return html + loading();
-  const all = S.books;
-  const mine = all.filter(b => (b.shelf || "read") === "read");
-  if (!mine.length) return html + '<section class="card"><div class="empty">書櫃還是空的。<br>新增一本書開始記筆記，或直接上傳 PDF／EPUB，原文也會進知識庫。</div></section>';
-  const cols = ["", "green", "yellow"];
-  html += '<section class="card"><div class="label">我的書（' + mine.length + "）</div><div class=\"stack\">" + mine.map((b, i) => {
-    const bits = [b.notes + " 則筆記"];
-    if (b.file_name) bits.push(b.status === "ready" ? (b.pages ? "原文 " + b.pages + (b.file_name.toLowerCase().endsWith(".epub") ? " 章" : " 頁") : "原文") : b.status === "error" ? "原文讀取失敗" : "原文處理中");
-    if (b.analyzed) bits.push("已分析");
-    return '<button class="list-row" data-act="open-book" data-id="' + b.id + '"><span class="ic ' + cols[i % 3] + '">' + esc((b.title || "?").slice(0, 1)) + '</span><span class="t"><b>' + esc(b.title) + '</b><span class="sub">' + esc(b.author ? b.author + " · " : "") + bits.join(" · ") + '</span></span><span class="chev">›</span></button>';
-  }).join("") + "</div></section>";
-  return html;
-}
-
 function jobCard(job){
   if (!job || job.status === "done") return "";
   const name = {bookfile: "讀取原文", analyze: "AI 分析", lecture: "處理課程", resummarize: "重新摘要", evaluate: "選書評估"}[job.kind] || "處理中";
@@ -100,12 +89,12 @@ function jobCard(job){
 }
 
 function renderBook(){
-  const back = '<button class="btn ghost back" data-act="back">' + ICON.back + "書櫃</button>";
+  const back = '<button class="btn ghost back" data-act="back">' + ICON.back + ({ask: "助理", mybooks: "我的書"}[S.view] || "書櫃") + "</button>";
   if (!S.book || S.book.book.id !== S.sub.id) return back + loading();
   if (S.book.book.shelf === "wish") return renderWishBook();
   const {book: b, notes, job} = S.book;
   const live = (S.jobs || []).find(j => j.ref_id === b.id && (j.kind === "bookfile" || j.kind === "analyze") && j.status !== "done") || job;
-  let html = back + '<section class="card hero"><div class="label">書</div><h1>' + esc(b.title) + "</h1>" +
+  let html = back + '<section class="card hero"><div class="row between"><div class="label">書</div>' + starBtn("book", b.id, b.starred) + "</div><h1>" + esc(b.title) + "</h1>" +
     (b.author ? '<div class="sub">' + esc(b.author) + "</div>" : "") +
     '<div class="row wrap"><span class="chip">' + notes.length + " 則筆記</span>" +
     (b.file_name ? '<span class="chip">原文：' + esc(b.file_name) + "</span>" : "") + "</div></section>";
@@ -136,14 +125,14 @@ function noteHTML(n){
     '<div class="acts"><button class="btn ghost sm" data-act="note-edit" data-id="' + n.id + '">' + ICON.edit + '編輯</button><button class="btn ghost sm" data-act="note-del" data-id="' + n.id + '">' + ICON.trash + "刪除</button></div></div>";
 }
 function analysisHTML(a){
-  let html = '<section class="card"><div class="row between"><div class="label">AI 分析</div><span class="tiny muted">' + esc(a.at || "") + "</span></div>";
+  let html = '<section class="card" data-read="AI 分析"><div class="row between no-read"><div class="label">AI 分析</div>' + readBtn() + "</div>";
   if (a.summary) html += '<p style="margin:0;line-height:1.75">' + esc(a.summary) + "</p>";
   if ((a.themes || []).length) html += '<div class="stack">' + a.themes.map(t => '<div class="sec"><h3>' + esc(t.title) + '</h3><div class="small" style="line-height:1.7">' + esc(t.explain || "") + "</div></div>").join("") + "</div>";
   if ((a.connections || []).length){
     html += '<div class="label">跟其他書和課程的關聯</div><div class="stack">' + a.connections.map(c => '<div class="pt"><span class="chip green" style="flex:none">' + esc(c.theme || "") + '</span><span class="rich">' + richHTML(c.text, "analysis") + "</span></div>").join("") + "</div>";
   }
   if ((a.questions || []).length) html += '<div class="label">值得再想的問題</div><ol style="margin:0;padding-left:22px;line-height:1.8">' + a.questions.map(q => "<li>" + esc(q) + "</li>").join("") + "</ol>";
-  return html + "</section>";
+  return html + '<div class="tiny muted">' + esc(a.at || "") + "</div></section>";
 }
 function noteSheet(n){
   const isNew = !n.id;
@@ -156,21 +145,3 @@ function noteSheet(n){
 }
 
 /* ---------- 朗讀 ---------- */
-function renderTts(){
-  const t = S.tts, pr = (S.settings && S.settings.prefs) || {};
-  if (t.lang == null) t.lang = pr.tts_lang || "zh";
-  if (t.speed == null) t.speed = pr.tts_speed || 1.0;
-  const ready = t.parts.filter(p => t.ready[p]).length;
-  let html = '<section class="card"><div class="label">輸入文字，用你的 GPT-SoVITS 聲音唸出來</div>' +
-    '<textarea class="input" id="tts-text" rows="7" placeholder="貼上文章、筆記或課程摘要…" data-draft="tts">' + esc(t.text) + "</textarea>" +
-    '<div class="seg" role="group" aria-label="語言">' + [["zh", "中英混合"], ["en", "英文"], ["auto", "自動"]].map(o => '<button data-act="tts-lang" data-v="' + o[0] + '" aria-pressed="' + (t.lang === o[0]) + '">' + o[1] + "</button>").join("") + "</div>" +
-    '<div class="field"><label for="tts-speed">速度：<span id="tts-speed-v">' + Number(t.speed).toFixed(1) + '×</span></label><input type="range" id="tts-speed" min="0.6" max="1.6" step="0.1" value="' + t.speed + '" data-act-change="tts-speed"></div>' +
-    '<div class="row"><button class="btn grow" data-act="tts-go"' + (S.busy.tts ? " disabled" : "") + ">" + (t.playing ? ICON.stop + "停止" : ICON.play + "開始朗讀") + "</button>" +
-    (t.parts.length ? '<button class="btn soft" data-act="tts-download"' + (S.busy.ttsDl ? " disabled" : "") + ">" + (S.busy.ttsDl ? '<span class="spinner"></span>' : ICON.down) + "下載</button>" : "") + "</div>" +
-    (S.err.tts ? '<div class="err">' + esc(S.err.tts) + "</div>" : "") + "</section>";
-  if (t.parts.length){
-    html += '<section class="card"><div class="row between"><div class="label">分段（點一段從那裡開始）</div><span class="tiny muted">準備好 ' + ready + " / " + t.parts.length + "</span></div>" +
-      '<div class="stack">' + t.parts.map((p, i) => { const now = i === t.i && t.playing; return '<button class="part' + (now ? " playing" : "") + (t.ready[p] ? " ok" : "") + '" data-act="tts-from" data-i="' + i + '"><span class="st">' + (now ? (t.ready[p] ? "▶" : '<span class="spinner" style="width:14px;height:14px"></span>') : t.ready[p] ? "✓" : i + 1) + '</span><span class="grow">' + esc(p) + "</span></button>"; }).join("") + "</div></section>";
-  }
-  return html;
-}

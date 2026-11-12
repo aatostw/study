@@ -15,7 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=12">
+<link rel="stylesheet" href="css/app.css?v=13">
 </head>
 <body>
 <div class="app" id="app">
@@ -32,11 +32,11 @@
   <main id="main" aria-live="polite">
     <div class="card flat"><div class="row"><span class="spinner"></span><span>載入中…</span></div></div>
   </main>
+  <div id="mini" class="mini" hidden></div>
   <nav class="tabs" id="tabs" hidden>
-    <button class="tab" data-act="tab" data-v="ask"><span class="tab-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5A2.5 2.5 0 0 1 5.5 3h13A2.5 2.5 0 0 1 21 5.5v9a2.5 2.5 0 0 1-2.5 2.5H10l-4.6 3.7c-.6.5-1.4 0-1.4-.7V17a2.5 2.5 0 0 1-1-2z" fill="#4C8BE0"/><circle cx="8.2" cy="10" r="1.4" fill="#fff"/><circle cx="12" cy="10" r="1.4" fill="#fff"/><circle cx="15.8" cy="10" r="1.4" fill="#FFE07A"/></svg></span>問答</button>
     <button class="tab" data-act="tab" data-v="books"><span class="tab-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="4.6" height="16" rx="1.2" fill="#4DB892"/><rect x="8.6" y="2.5" width="4.6" height="17.5" rx="1.2" fill="#4C8BE0"/><path d="M14.6 5.6l3.9-1.1 3 14.5-3.9 1.1z" fill="#EB5D5D"/><rect x="2" y="20" width="20" height="2" rx="1" fill="#9AA6B3"/></svg></span>書櫃</button>
-    <button class="tab" data-act="tab" data-v="lectures"><span class="tab-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="13.5" rx="2.5" fill="#4DB892"/><path d="M10 8v6l5-3z" fill="#fff"/><rect x="7" y="19.5" width="10" height="2" rx="1" fill="#9AA6B3"/></svg></span>課程</button>
-    <button class="tab" data-act="tab" data-v="tts"><span class="tab-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9.5h3.5L11.5 5v14l-5-4.5H3z" fill="#E66B44"/><path d="M15 8.5a5 5 0 0 1 0 7M18 5.5a9 9 0 0 1 0 13" fill="none" stroke="#F3B93D" stroke-width="2.2" stroke-linecap="round"/></svg></span>朗讀</button>
+    <button class="tab" data-act="tab" data-v="review"><span class="tab-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="3" fill="#F3B93D"/><rect x="3" y="4" width="18" height="5" rx="2.5" fill="#E66B44"/><rect x="7" y="2" width="2.4" height="5" rx="1.2" fill="#9AA6B3"/><rect x="14.6" y="2" width="2.4" height="5" rx="1.2" fill="#9AA6B3"/><path d="M8 14.5l2.6 2.6L16.5 11" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>知識複習</button>
+    <button class="tab" data-act="tab" data-v="ask"><span class="tab-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5A2.5 2.5 0 0 1 5.5 3h13A2.5 2.5 0 0 1 21 5.5v9a2.5 2.5 0 0 1-2.5 2.5H10l-4.6 3.7c-.6.5-1.4 0-1.4-.7V17a2.5 2.5 0 0 1-1-2z" fill="#4C8BE0"/><circle cx="8.2" cy="10" r="1.4" fill="#fff"/><circle cx="12" cy="10" r="1.4" fill="#fff"/><circle cx="15.8" cy="10" r="1.4" fill="#FFE07A"/></svg></span>助理</button>
     <button class="tab" data-act="tab" data-v="prefs"><span class="tab-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 2h3.4l.5 2.6 1.7.8 2.2-1.5 2.4 2.4-1.5 2.2.8 1.7 2.6.5v3.4l-2.6.5-.8 1.7 1.5 2.2-2.4 2.4-2.2-1.5-1.7.8-.5 2.6h-3.4l-.5-2.6-1.7-.8-2.2 1.5-2.4-2.4 1.5-2.2-.8-1.7L2 13.7v-3.4l2.6-.5.8-1.7-1.5-2.2 2.4-2.4 2.2 1.5 1.7-.8z" fill="#8A97A6"/><circle cx="12" cy="12" r="3.4" fill="#fff"/></svg></span>設定</button>
   </nav>
   <div id="sheet" class="sheet" hidden>
@@ -55,12 +55,13 @@
   <input type="file" id="pick-photo" accept="image/*" capture="environment" hidden>
 </div>
 
-<script src="js/core.js?v=12"></script>
-<script src="js/upload.js?v=12"></script>
-<script src="js/pages.js?v=12"></script>
-<script src="js/lecture.js?v=12"></script>
-<script src="js/wish.js?v=12"></script>
-<script src="js/settings.js?v=12"></script>
-<script src="js/actions.js?v=12"></script>
+<script src="js/core.js?v=13"></script>
+<script src="js/upload.js?v=13"></script>
+<script src="js/pages.js?v=13"></script>
+<script src="js/lecture.js?v=13"></script>
+<script src="js/wish.js?v=13"></script>
+<script src="js/shelf.js?v=13"></script>
+<script src="js/settings.js?v=13"></script>
+<script src="js/actions.js?v=13"></script>
 </body>
 </html>

@@ -131,7 +131,7 @@ async def ai_test(request: Request):
 @app.get("/books")
 def books():
     rows = db.all("SELECT b.id, b.title, b.author, b.file_name, b.pages, b.status, b.updated_at, b.shelf, b.isbn, "
-                  "b.analysis IS NOT NULL AS analyzed, b.evaluation->'credibility'->>'light' AS light, "
+                  "b.starred, b.analysis IS NOT NULL AS analyzed, b.evaluation->'credibility'->>'light' AS light, "
                   "b.evaluation->'verdict'->>'level' AS verdict, b.evaluation->'reception'->>'headline' AS headline, "
                   "(SELECT count(*) FROM notes n WHERE n.book_id = b.id) AS notes, "
                   "(SELECT status FROM jobs j WHERE j.ref_id = b.id AND j.kind = 'evaluate' ORDER BY j.id DESC LIMIT 1) AS eval_status "
@@ -266,11 +266,56 @@ async def note_add(bid: int, request: Request):
     return {"ok": True, "note": r}
 
 
+# ---------- 記事本（獨立筆記）----------
+
+@app.get("/notes")
+def notebook():
+    rows = db.all("SELECT id, title, left(content, 160) AS preview, starred, created_at, updated_at, "
+                  "EXISTS (SELECT 1 FROM chunks c WHERE c.note_id = n.id) AS indexed "
+                  "FROM notes n WHERE book_id IS NULL ORDER BY updated_at DESC")
+    return {"ok": True, "notes": rows}
+
+
+@app.post("/notes")
+async def notebook_add(request: Request):
+    b = await body_json(request)
+    title, content = s(b.get("title"), 200), s(b.get("content"), 30000)
+    if not title and not content:
+        raise Bad("標題和內容至少填一個")
+    r = db.one("INSERT INTO notes (book_id, title, content, source) VALUES (NULL, %s, %s, 'typed') RETURNING *", (title, content))
+    return {"ok": True, "note": r}
+
+
+@app.get("/notes/{nid}")
+def note_get(nid: int):
+    r = db.one("SELECT n.*, EXISTS (SELECT 1 FROM chunks c WHERE c.note_id = n.id) AS indexed FROM notes n WHERE id = %s", (nid,))
+    if not r:
+        raise Bad("找不到這則筆記", 404)
+    return {"ok": True, "note": r}
+
+
+@app.post("/star")
+async def star(request: Request):
+    """收藏：書、記事本、課程都可以釘在書櫃最上面"""
+    b = await body_json(request)
+    table = {"book": "books", "note": "notes", "lecture": "lectures"}.get(b.get("kind"))
+    if not table:
+        raise Bad("不知道要收藏什麼")
+    r = db.one("UPDATE %s SET starred = %%s WHERE id = %%s RETURNING id, starred" % table, (bool(b.get("on")), int(b.get("id") or 0)))
+    if not r:
+        raise Bad("找不到", 404)
+    return {"ok": True, "starred": r["starred"]}
+
+
 @app.patch("/notes/{nid}")
 async def note_edit(nid: int, request: Request):
     b = await body_json(request)
-    r = db.one("UPDATE notes SET quote = %s, content = %s, chapter = %s, page = %s, updated_at = now() WHERE id = %s RETURNING *",
-               (s(b.get("quote"), 8000), s(b.get("content"), 8000), s(b.get("chapter"), 200), s(b.get("page"), 40), nid))
+    cur = db.one("SELECT * FROM notes WHERE id = %s", (nid,))
+    if not cur:
+        raise Bad("找不到這則筆記", 404)
+    g = lambda k, n: s(b.get(k, cur[k]), n)
+    r = db.one("UPDATE notes SET title = %s, quote = %s, content = %s, chapter = %s, page = %s, updated_at = now() WHERE id = %s RETURNING *",
+               (g("title", 200), g("quote", 8000), g("content", 30000), g("chapter", 200), g("page", 40), nid))
     if not r:
         raise Bad("找不到這則筆記", 404)
     db.run("DELETE FROM chunks WHERE note_id = %s", (nid,))      # 背景會重建向量
@@ -490,7 +535,7 @@ async def inbox_import(request: Request):
 @app.get("/lectures")
 def lectures():
     rows = db.all("SELECT id, course, title, lang, duration, status, created_at, summary IS NOT NULL AS summarized, "
-                  "summary->>'overview' AS overview FROM lectures ORDER BY created_at DESC")
+                  "starred, summary->>'overview' AS overview FROM lectures ORDER BY created_at DESC")
     return {"ok": True, "lectures": rows}
 
 

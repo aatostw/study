@@ -6,10 +6,10 @@ const LS = "study1:";
 const DEFAULT_API = "https://study-api.natursai.com";
 
 const S = {
-  view: "ask", sub: null,                     // sub: {type:"book"|"lecture", id}
+  view: "books", sub: null,                   // sub: {type:"book"|"lecture"|"note", id}
   token: lsGet("token") || "", api: lsGet("api") || DEFAULT_API,
   online: null, status: null,
-  books: null, book: null, lectures: null, lecture: null, lecTab: "sum", trFilter: "",
+  books: null, book: null, notes: null, note: null, assist: null, lectures: null, lecture: null, lecTab: "sum", trFilter: "",
   jobs: [], asks: null, ask: {scope: "all", cur: null, busy: false, draft: ""},
   settings: null, models: {}, tts: {parts: [], i: -1, playing: false, lang: null, speed: null, text: "", ready: {}},
   uploads: [], inbox: null, busy: {}, err: {}, sheet: null
@@ -98,7 +98,7 @@ function errMsg(e){ return (e && e.message) || String(e); }
 
 function logout(expired){
   S.token = ""; lsSet("token", null);
-  S.books = S.lectures = S.asks = S.settings = S.status = null;
+  S.books = S.lectures = S.notes = S.asks = S.settings = S.status = null;
   showGate(expired ? "登入過期了，請重新登入。" : "");
 }
 
@@ -107,17 +107,18 @@ function render(){
   if (!S.token){ showGate(); return; }
   $("#gate").hidden = true;
   $("#tabs").hidden = false;
-  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-current", t.dataset.v === S.view ? "page" : "false"));
+  document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-current", t.dataset.v === (TAB_OF[S.view] || S.view) ? "page" : "false"));
   const main = $("#main");
-  const key = S.view + "|" + (S.sub ? S.sub.type + S.sub.id : "") + "|" + (S.view === "lectures" ? S.lecTab : "");
+  const key = S.view + "|" + (S.sub ? S.sub.type + S.sub.id : "") + "|" + (S.view === "lectures" ? S.lecTab : "") + "|" + (S.assist || "");
   const keep = render.last === key ? main.scrollTop : 0;
-  const fn = S.sub ? (S.sub.type === "book" ? renderBook : renderLecture)
-    : ({ask: renderAsk, books: renderBooks, lectures: renderLectures, tts: renderTts, prefs: renderPrefs}[S.view] || renderAsk);
+  const fn = S.sub ? ({book: renderBook, lecture: renderLecture, note: renderNote}[S.sub.type])
+    : ({ask: renderAsk, books: renderShelf, mybooks: renderMyBooks, notebook: renderNotebook, lectures: renderLectures, review: renderReview, prefs: renderPrefs}[S.view] || renderShelf);
   const active = document.activeElement, activeId = active && active.id, sel = active && active.selectionStart;
   main.innerHTML = fn();
   main.scrollTop = keep;
   render.last = key;
   if (activeId){ const el = document.getElementById(activeId); if (el && el !== document.body){ el.focus(); try { if (sel != null) el.setSelectionRange(sel, sel); } catch (e) {} } }
+  renderMini();
   if (typeof afterRender === "function") afterRender();
 }
 function go(view, sub){

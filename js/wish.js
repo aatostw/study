@@ -7,14 +7,10 @@
 const LIGHT = {green: ["可信", "green", "🟢"], yellow: ["留意", "yellow", "🟡"], red: ["警訊", "red", "🔴"], unknown: ["資料不足", "", "⚪"]};
 const VERDICT = {read: ["值得讀", "green"], skim: ["挑章節讀", "yellow"], skip: ["可以跳過", "red"]};
 
-function shelfSeg(){
-  const n = s => (S.books || []).filter(b => (b.shelf || "read") === s).length;
-  return '<div class="seg" role="group" aria-label="書櫃">' + [["read", "我的書"], ["wish", "想讀"]].map(o =>
-    '<button data-act="shelf" data-v="' + o[0] + '" aria-pressed="' + ((S.shelf || "read") === o[0]) + '">' + o[1] + (S.books ? "（" + n(o[0]) + "）" : "") + "</button>").join("") + "</div>";
-}
-
 function renderWishList(){
-  let html = shelfSeg() + '<button class="btn block" data-act="wish-new">' + ICON.plus + "加入想讀，自動評估</button>";
+  let html = '<button class="btn ghost back" data-act="assist">' + ICON.back + "助理</button>" +
+    '<section class="card hero"><div class="label">想讀清單</div><h1>這本值得讀嗎？</h1><div class="sub">電腦會上網找讀者心得和作者背景，判斷可信度、適不適合你。</div></section>' +
+    '<button class="btn block" data-act="wish-new">' + ICON.plus + "評估一本書</button>";
   if (!S.books) return html + loading();
   const list = S.books.filter(b => b.shelf === "wish");
   if (!list.length) return html + '<section class="card"><div class="empty">還沒有想讀的書。<br>輸入書名，或拍封面、條碼，電腦會上網找評價和作者背景，幫你判斷值不值得讀。</div></section>';
@@ -56,11 +52,11 @@ function evalCite(text){
 function evalItem(x){ return evalCite(x.text) + (x.src ? " " + evalCite(x.src) : ""); }
 
 function renderWishBook(){
-  const back = '<button class="btn ghost back" data-act="back">' + ICON.back + "想讀</button>";
+  const back = '<button class="btn ghost back" data-act="wish-back">' + ICON.back + "想讀清單</button>";
   const {book: b, job} = S.book;
   const live = (S.jobs || []).find(j => j.ref_id === b.id && j.kind === "evaluate" && j.status !== "done") || (job && job.kind === "evaluate" ? job : null);
   const ev = b.evaluation;
-  let html = back + '<section class="card hero"><div class="label">想讀</div><h1>' + esc(b.title) + "</h1>" +
+  let html = back + '<section class="card hero"><div class="row between"><div class="label">想讀</div>' + starBtn("book", b.id, b.starred) + "</div><h1>" + esc(b.title) + "</h1>" +
     (b.author ? '<div class="sub">' + esc(b.author) + "</div>" : "") +
     '<div class="row wrap">' + (b.isbn ? '<span class="chip en">ISBN ' + esc(b.isbn) + "</span>" : "") +
     (ev && ev.book && ev.book.publisher ? '<span class="chip">' + esc(ev.book.publisher + (ev.book.year ? " · " + ev.book.year : "")) + "</span>" : "") + "</div>" +
@@ -73,9 +69,9 @@ function renderWishBook(){
   if (!ev) return html + (live ? "" : '<section class="card"><div class="empty">還沒有評估。按「開始評估」，電腦會上網找資料，大約 1～3 分鐘。</div></section>');
 
   const L = LIGHT[ev.credibility.light] || LIGHT.unknown, V = VERDICT[ev.verdict.level] || VERDICT.skim;
-  html += '<section class="card verdict ' + V[1] + '"><div class="row between"><div class="label">結論</div><span class="chip ' + V[1] + '" style="font-size:15px">' + V[0] + "</span></div>" +
+  html += '<section class="card verdict ' + V[1] + '" data-read="《' + esc(b.title) + '》評估"><div class="row between"><div class="label">結論</div><span class="chip ' + V[1] + '" style="font-size:15px">' + V[0] + "</span></div>" +
     '<p style="margin:0;line-height:1.75">' + evalCite(ev.verdict.text) + "</p>" +
-    (ev.book.summary ? '<div class="small muted">' + evalCite(ev.book.summary) + "</div>" : "") + "</section>";
+    (ev.book.summary ? '<div class="small muted">' + evalCite(ev.book.summary) + "</div>" : "") + '<div class="no-read">' + readBtn("朗讀結論") + "</div></section>";
 
   html += '<section class="card"><div class="row between"><div class="label">可信度（防唬爛）</div><span class="chip ' + L[1] + '">' + L[2] + " " + L[0] + "</span></div>" +
     (ev.credibility.headline ? "<b>" + evalCite(ev.credibility.headline) + "</b>" : "") +

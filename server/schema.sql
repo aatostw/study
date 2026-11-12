@@ -123,3 +123,11 @@ CREATE TABLE IF NOT EXISTS web_cache (
   why text NOT NULL DEFAULT '',
   fetched_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- 一體化：記事本（不屬於任何書的獨立筆記）、收藏
+ALTER TABLE notes ALTER COLUMN book_id DROP NOT NULL;
+ALTER TABLE notes ADD COLUMN IF NOT EXISTS title text NOT NULL DEFAULT '';
+ALTER TABLE notes ADD COLUMN IF NOT EXISTS starred boolean NOT NULL DEFAULT false;
+ALTER TABLE books ADD COLUMN IF NOT EXISTS starred boolean NOT NULL DEFAULT false;
+ALTER TABLE lectures ADD COLUMN IF NOT EXISTS starred boolean NOT NULL DEFAULT false;
+CREATE INDEX IF NOT EXISTS notes_free ON notes(updated_at DESC) WHERE book_id IS NULL;

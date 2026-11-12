@@ -97,7 +97,7 @@ function renderSoon(){
     renderSoon.t = null;
     const a = document.activeElement;
     /* 正在打字就先不要重畫，等一下再說 */
-    if (a && $("#main").contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type !== "range") return renderSoon();
+    if (a && $("#main").contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type !== "range"){ renderMini(); return renderSoon(); }
     render();
   }, 250);
 }

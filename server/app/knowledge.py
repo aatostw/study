@@ -12,6 +12,8 @@ from .textutil import chunk_text, fmt_t
 
 def note_text(n):
     parts = []
+    if n.get("title"):
+        parts.append("標題：" + n["title"])
     if n.get("quote"):
         parts.append("摘句：" + n["quote"])
     if n.get("content"):
@@ -94,9 +96,9 @@ def search(query, scope="all", k=10):
     where, args = _scope_sql(scope)
     rows = db.all(
         "SELECT c.id, c.kind, c.book_id, c.note_id, c.lecture_id, c.page, c.chapter, c.t0, c.t1, c.text, "
-        "b.title AS book_title, b.author, l.title AS lecture_title, l.course, "
+        "b.title AS book_title, b.author, l.title AS lecture_title, l.course, n.title AS note_title, "
         "1 - (c.embedding <=> %s::vector) AS score "
-        "FROM chunks c LEFT JOIN books b ON b.id = c.book_id LEFT JOIN lectures l ON l.id = c.lecture_id "
+        "FROM chunks c LEFT JOIN books b ON b.id = c.book_id LEFT JOIN lectures l ON l.id = c.lecture_id LEFT JOIN notes n ON n.id = c.note_id "
         "WHERE c.embedding IS NOT NULL AND " + where + " ORDER BY c.embedding <=> %s::vector LIMIT %s",
         (v,) + args + (v, k))
     return [source_view(r) for r in rows]
@@ -105,6 +107,8 @@ def search(query, scope="all", k=10):
 def source_view(r):
     if r["kind"] == "lecture":
         label = "%s%s @ %s" % ((r["course"] + "｜") if r.get("course") else "", r["lecture_title"], fmt_t(r["t0"]))
+    elif r["kind"] == "note" and not r.get("book_id"):
+        label = "記事本：%s" % (r.get("note_title") or "（無標題）")
     else:
         bits = ["《%s》" % r["book_title"]]
         if r.get("chapter"):

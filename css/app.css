@@ -325,3 +325,33 @@ h1,h2{color:var(--primary-text)}
 .cam-lib{width:60px;display:grid;justify-items:center;gap:4px;border:0;background:none;color:#fff;font-size:12px}
 .cam-lib span{width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,.22);display:grid;place-items:center;font-size:24px}
 .cam-lib.ghost{visibility:hidden}
+
+/* ---------- 一體化：書櫃、收藏、助理快捷、小播放條 ---------- */
+.tabs{grid-template-columns:repeat(4,1fr)}
+.star{border:0;background:none;font-size:24px;line-height:1;padding:2px 4px;color:var(--muted);cursor:pointer}
+.star.on{color:#E2A400}
+.hero .star{color:rgba(255,255,255,.75)}
+.hero .star.on{color:#FFD45C}
+.card.starred{border-color:color-mix(in srgb,#E2A400 40%,var(--line));background:linear-gradient(var(--surface),color-mix(in srgb,var(--yellow-soft) 45%,var(--surface)))}
+.chips{display:flex;flex:none;gap:8px;overflow-x:auto;padding-bottom:4px!important;scrollbar-width:none;margin:0 -16px;padding:0 16px}
+.chips::-webkit-scrollbar{display:none}
+.chip-btn{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 14px;font-size:14px;font-weight:600;color:var(--ink);box-shadow:var(--shadow)}
+.chip-btn:active{transform:scale(.96)}
+.mini{position:relative;display:flex;align-items:center;gap:6px;padding:8px 10px;background:var(--surface);border-top:1px solid var(--line);overflow:hidden}
+.mini[hidden]{display:none}
+.mini-prog{position:absolute;left:0;top:0;height:3px;background:var(--primary);transition:width .3s}
+.mini-play{width:44px;height:44px;flex:none;border:0;border-radius:50%;background:var(--primary);color:#fff;display:grid;place-items:center}
+.mini-play svg{width:20px;height:20px}
+.mini-btn{flex:none;border:0;background:none;font-size:16px;padding:6px;color:var(--ink);border-radius:8px}
+.mini-btn:disabled{opacity:.3}
+.mini-btn.rate{font:700 13px var(--font-en);background:var(--field);padding:5px 8px}
+.mini-t{flex:1;min-width:0;border:0;background:none;text-align:left;display:flex;flex-direction:column;padding:0 4px;color:inherit}
+.mini-t b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini-t span{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (min-width:768px){
+  .app{grid-template-rows:auto minmax(0,1fr) auto}
+  .tabs{grid-row:2 / span 2}
+  .mini{grid-column:-2;grid-row:3;padding:10px max(24px,calc(50% - 370px))}
+  .chips{margin:0;padding:0}
+}
+.list-row .sub{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
