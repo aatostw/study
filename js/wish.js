@@ -30,8 +30,9 @@ function renderWishList(){
 
 function wishSheet(pre){
   pre = pre || {};
-  openSheet('<h2>加入想讀</h2><div class="small muted">填書名就好，作者和 ISBN 有的話更準。也可以拍封面或書背的條碼。</div>' +
-    '<button class="btn soft block" data-act="pick-cover">' + (S.busy.identify ? '<span class="spinner"></span>辨識中…' : ICON.camera + "拍照或選圖片（封面、條碼）") + "</button>" +
+  openSheet('<h2>加入想讀</h2><div class="small muted">填書名就好，作者和 ISBN 有的話更準。也可以拍封面、條碼，或從相簿選現有的照片。</div>' +
+    (S.busy.identify ? '<div class="btn soft block" aria-busy="true"><span class="spinner"></span>辨識中…</div>'
+      : '<div class="row"><button class="btn soft grow" data-act="pick-cover">' + ICON.camera + '拍照</button><button class="btn soft grow" data-act="pick-cover" data-lib="1">🖼️ 從相簿選</button></div>') +
     '<div class="field"><label for="w-title">書名</label><input class="input" id="w-title" value="' + esc(pre.title || "") + '" placeholder="被討厭的勇氣"></div>' +
     '<div class="row"><div class="field grow"><label for="w-author">作者</label><input class="input" id="w-author" value="' + esc(pre.author || "") + '"></div>' +
     '<div class="field" style="width:44%"><label for="w-isbn">ISBN（選填）</label><input class="input en" id="w-isbn" inputmode="numeric" value="' + esc(pre.isbn || "") + '"></div></div>' +

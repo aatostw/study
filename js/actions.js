@@ -211,7 +211,7 @@ const ACT = {
     if (!body.title && !body.isbn) return toast("請填書名或 ISBN");
     act("wishc", async () => { const r = await api("/books", {json: body}); closeSheet(); S.books = null; S.shelf = "wish"; pollJobs(true); go("books", {type: "book", id: r.book.id}); });
   },
-  "pick-cover": () => { $("#pick-cover").value = ""; $("#pick-cover").click(); },
+  "pick-cover": el => { const i = $(el.dataset.lib ? "#pick-cover-lib" : "#pick-cover"); i.value = ""; i.click(); },
   "evaluate": el => act("evaluate", async () => { await api("/books/" + el.dataset.id + "/evaluate", {method: "POST"}); toast("開始評估，大約 1～3 分鐘"); pollJobs(true); await loadBook(); }),
   "evid-open": () => evidenceSheet(S.book.book),
   "pick-evid": () => { $("#pick-evid").value = ""; $("#pick-evid").click(); },
@@ -392,7 +392,7 @@ document.addEventListener("change", async e => {
     Up.start(f, "book", S.bookTarget ? {book_id: S.bookTarget} : {title: f.name.replace(/\.[^.]+$/, "")});
     if (!S.sub && S.view !== "books") go("books");
   }
-  if (el.id === "pick-cover" && el.files[0]){
+  if ((el.id === "pick-cover" || el.id === "pick-cover-lib") && el.files[0]){
     const keep = {title: $("#w-title").value, author: $("#w-author").value, isbn: $("#w-isbn").value, wish_note: $("#w-note").value};
     S.busy.identify = true; wishSheet(keep);
     try {
