@@ -134,7 +134,7 @@ async function identifyCover(file){
       const isbn = (codes.map(c => c.rawValue).find(v => /^97[89]\d{10}$/.test(v)) || "");
       if (isbn){
         const r = await api("/lookup?isbn=" + isbn);
-        return Object.assign({isbn}, r.book);
+        if (r.book.title) return Object.assign({isbn}, r.book);
       }
     }
   } catch (e) {}

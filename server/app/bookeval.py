@@ -43,9 +43,48 @@ def _pref(u):
     return 2
 
 
+def isbn_ok(isbn):
+    """檢查 ISBN 的檢查碼，擋掉 AI 看錯一兩位數字的情況"""
+    s = re.sub(r"[^0-9Xx]", "", isbn or "").upper()
+    if len(s) == 13 and s.isdigit():
+        return sum(int(c) * (1 if i % 2 == 0 else 3) for i, c in enumerate(s)) % 10 == 0
+    if len(s) == 10 and s[:9].isdigit() and (s[9].isdigit() or s[9] == "X"):
+        return sum((10 - i) * (10 if c == "X" else int(c)) for i, c in enumerate(s)) % 11 == 0
+    return False
+
+
+ISBN_PROMPT = """下面是用 ISBN %s 在網路上搜尋到的結果（書店、圖書館、豆瓣等）。
+找出這個 ISBN 對應的書，只輸出 JSON：
+{"title": "書名（照台灣書店的寫法；只有簡體來源就照寫）", "author": "作者（譯者不算）", "publisher": "出版社", "year": "出版年（4 位數）"}
+只有在搜尋結果明確是這個 ISBN 的書時才填，看不出來就全部留空字串，不要猜。
+
+%s"""
+
+
+def _isbn_by_search(isbn):
+    """台灣、中國的書 Google Books 常常查不到，改用自架搜尋直接搜 ISBN，再請 AI 從結果認出書名"""
+    try:
+        hits = websearch.search(isbn, n=10) + websearch.search("ISBN " + isbn + " 書", n=6)
+    except RuntimeError:
+        return None
+    hits = [h for h in hits if not BLOCK.search(h["url"])][:12]
+    if not hits:
+        return None
+    lines = "\n".join("- %s｜%s｜%s" % (h["title"], h["snippet"][:200], urlparse(h["url"]).netloc) for h in hits)
+    try:
+        d, _ = ai.generate_json("evaluate", ISBN_PROMPT % (isbn, lines), max_tokens=400)
+    except ai.AIError:
+        return None
+    title = str(d.get("title") or "").strip()
+    if not title:
+        return None
+    return {"isbn": isbn, "title": title, "author": str(d.get("author") or "").strip(),
+            "publisher": str(d.get("publisher") or "").strip(), "year": str(d.get("year") or "").strip()[:4]}
+
+
 def lookup_isbn(isbn):
-    """用 ISBN 查書名、作者、出版社（Google Books，查不到再試 Open Library）"""
-    isbn = re.sub(r"[^0-9Xx]", "", isbn or "")
+    """用 ISBN 查書名、作者、出版社：Google Books → Open Library → 自架搜尋＋AI"""
+    isbn = re.sub(r"[^0-9Xx]", "", isbn or "").upper()
     if len(isbn) not in (10, 13):
         return None
     try:
@@ -53,17 +92,18 @@ def lookup_isbn(isbn):
         items = (r.json().get("items") or []) if r.status_code == 200 else []
         if items:
             v = items[0].get("volumeInfo", {})
-            return {"isbn": isbn, "title": v.get("title", "") + ((("：" + v["subtitle"]) if v.get("subtitle") else "")),
-                    "author": "、".join(v.get("authors") or []), "publisher": v.get("publisher", ""),
-                    "year": (v.get("publishedDate") or "")[:4]}
+            if v.get("title"):
+                return {"isbn": isbn, "title": v.get("title", "") + ((("：" + v["subtitle"]) if v.get("subtitle") else "")),
+                        "author": "、".join(v.get("authors") or []), "publisher": v.get("publisher", ""),
+                        "year": (v.get("publishedDate") or "")[:4]}
         r = httpx.get("https://openlibrary.org/api/books", params={"bibkeys": "ISBN:" + isbn, "format": "json", "jscmd": "data"}, timeout=12)
         d = (r.json() or {}).get("ISBN:" + isbn) if r.status_code == 200 else None
-        if d:
+        if d and d.get("title"):
             return {"isbn": isbn, "title": d.get("title", ""), "author": "、".join(a.get("name", "") for a in d.get("authors") or []),
                     "publisher": "、".join(p.get("name", "") for p in d.get("publishers") or []), "year": str(d.get("publish_date", ""))[-4:]}
     except (httpx.HTTPError, ValueError):
         pass
-    return {"isbn": isbn, "title": "", "author": "", "publisher": "", "year": ""}
+    return _isbn_by_search(isbn) or {"isbn": isbn, "title": "", "author": "", "publisher": "", "year": ""}
 
 
 NAMES_PROMPT = """我要在網路上找這本書的評價和作者資料。請補齊各種寫法，只輸出 JSON：

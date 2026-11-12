@@ -399,7 +399,7 @@ document.addEventListener("change", async e => {
       const r = await identifyCover(el.files[0]);
       S.busy.identify = false;
       wishSheet({title: r.title || keep.title, author: r.author || keep.author, isbn: r.isbn || keep.isbn, wish_note: keep.wish_note});
-      toast(r.title ? "認出來了，確認一下" : "沒認出書名，請手動輸入");
+      toast(r.title ? "認出來了，確認一下" : r.isbn ? "讀到 ISBN，但查不到書名，請手動輸入書名" : "沒認出來，請拍清楚一點或手動輸入");
     } catch (err) { S.busy.identify = false; wishSheet(keep); toast(errMsg(err)); }
   }
   if (el.id === "pick-evid" && el.files[0]){

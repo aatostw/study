@@ -159,14 +159,16 @@ async def book_add(request: Request):
 
 @app.get("/lookup")
 def lookup(isbn: str):
+    if not bookeval.isbn_ok(isbn):
+        raise Bad("ISBN 不對（10 或 13 碼，檢查碼對不上），請再拍一次或手動輸入")
     info = bookeval.lookup_isbn(isbn)
-    if not info:
-        raise Bad("ISBN 格式不對（10 或 13 碼）")
     return {"ok": True, "book": info}
 
 
-IDENTIFY_PROMPT = ("這是一本書的照片（封面、書背或條碼）。辨識出書的資訊，只輸出 JSON："
-                   '{"isbn": "條碼或版權頁上的 ISBN，只要數字，看不到就空字串", "title": "書名", "author": "作者"}。看不清楚的欄位留空字串，不要猜。')
+IDENTIFY_PROMPT = ("這是一本書的照片（封面、書背、條碼或版權頁）。辨識出書的資訊，只輸出 JSON："
+                   '{"isbn": "ISBN，只要數字（條碼下方或上方印的 978／979 開頭 13 碼；不是價格條碼），看不到就空字串", '
+                   '"title": "照片上看得到的書名，看不到就空字串", "author": "照片上看得到的作者"}。'
+                   "只拍到條碼時書名和作者留空字串，不要猜。數字要一位一位仔細核對。")
 
 
 @app.post("/identify")
@@ -176,7 +178,9 @@ async def identify(request: Request):
     if not mt.startswith("image/") or not data or len(data) > 15 * 1024 * 1024:
         raise Bad("請上傳照片")
     d, used = ai.generate_json("ocr", IDENTIFY_PROMPT, images=[(mt, data)], max_tokens=500)
-    isbn = re.sub(r"[^0-9Xx]", "", str(d.get("isbn") or ""))
+    isbn = re.sub(r"[^0-9Xx]", "", str(d.get("isbn") or "")).upper()
+    if isbn and not bookeval.isbn_ok(isbn):
+        isbn = ""                                   # 看錯數字，寧可不要
     out = {"isbn": isbn, "title": str(d.get("title") or "").strip(), "author": str(d.get("author") or "").strip()}
     if isbn and (not out["title"] or not out["author"]):
         info = bookeval.lookup_isbn(isbn) or {}
