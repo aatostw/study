@@ -10,7 +10,9 @@
   6. 證據不夠時，照 AI 建議的關鍵字再查一輪
 """
 import re
+import json
 import time
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
 
 import httpx
@@ -189,7 +191,7 @@ def _fetch_some(pool, keys, prog, p0, p1, stats, limit=12):
             stats["blocked"] += 1
 
 
-EVAL_PROMPT = """你是嚴謹的選書顧問，幫一位台灣讀者判斷一本書值不值得讀、內容可不可信。
+EVAL_RULES = """你是嚴謹的選書顧問，幫一位台灣讀者判斷一本書值不值得讀、內容可不可信。
 下面是電腦從網路上找到的資料（[數字]）和讀者自己補充的資料（[U]），以及讀者知識庫裡的相關筆記（[K數字]）。
 
 評估原則：
@@ -200,23 +202,35 @@ EVAL_PROMPT = """你是嚴謹的選書顧問，幫一位台灣讀者判斷一本
 4. 讀者心得要寫「讀完的人覺得收穫在哪、失望在哪」，正反都要，具體不要空泛。評分只有在資料裡看得到才寫，連同評分人數。
 5. 適不適合：對照 [K] 筆記，判斷這本書對讀者是延伸、重複、挑戰還是全新領域。
 6. 台灣繁體中文。書名作者照實際資料寫。
+"""
 
-只輸出 JSON：
+# 一次寫完整份很長，容易被切斷 → 拆成三次：A 書和可信度、B 讀者評價（同時跑），C 綜合判斷
+PART_A = """只輸出 JSON（這次只寫書的基本資料和可信度）：
 {
  "book": {"title": "", "author": "", "original": "原文書名（沒有就空字串）", "publisher": "", "year": "", "summary": "2～3 句：這本書在講什麼"},
  "credibility": {"light": "green|yellow|red|unknown", "headline": "一句話結論",
                  "author": "作者背景，和主題相不相關 [n]",
-                 "reasons": [{"text": "判斷理由", "src": "[n]"}]},
+                 "reasons": [{"text": "判斷理由", "src": "[n]"}]}
+}"""
+
+PART_B = """只輸出 JSON（這次只寫讀者評價，正反各最多 5 點）：
+{
  "reception": {"headline": "一句話：讀者整體怎麼看",
                "ratings": [{"site": "豆瓣", "score": "8.1", "count": "2.3萬人", "src": "[n]"}],
                "pros": [{"text": "讀者說的收穫", "src": "[n]"}],
-               "cons": [{"text": "讀者說的缺點", "src": "[n]"}]},
+               "cons": [{"text": "讀者說的缺點", "src": "[n]"}]}
+}"""
+
+PART_C = """上面是已經整理好的「可信度」和「讀者評價」。根據它們和讀者的筆記 [K]，做最後判斷。
+只輸出 JSON：
+{
  "fit": {"relation": "延伸|重複|挑戰|全新領域", "text": "對照你的筆記說明 [K1]"},
  "verdict": {"level": "read|skim|skip", "text": "值得讀／挑章節讀／可以跳過 的理由，2～3 句"},
  "alternatives": [{"title": "", "author": "", "why": "為什麼可以考慮（資料裡有提到才寫）"}],
  "gaps": ["還缺什麼資料"],
  "followup_queries": ["如果資料不夠，建議再搜的關鍵字（最多 3 個）"]
 }"""
+
 
 
 def _evidence_text(sources, user_evidence, notes):
@@ -261,8 +275,30 @@ def run_evaluate(job, prog):
             s["n"] = i
         info = "要評估的書：%s　作者：%s　ISBN：%s　類型：%s\n讀者想讀的原因：%s\n\n" % (
             names["title_tc"], names["author_tc"] or "（未填）", b["isbn"] or "（未填）", names["kind"] or "（不確定）", b["wish_note"] or "（沒寫）")
-        prog("AI 評估中" + ("（第二輪）" if round_no == 2 else ""), 0.7 if round_no == 1 else 0.9, True)
-        d, used = ai.generate_json("evaluate", info + "資料：\n\n" + _evidence_text(sources, b["user_evidence"], notes) + "\n\n" + EVAL_PROMPT, max_tokens=8000)
+        r2 = "（第二輪）" if round_no == 2 else ""
+        base = EVAL_RULES + "\n\n" + info + "資料：\n\n" + _evidence_text(sources, b["user_evidence"], notes) + "\n\n"
+        prog("AI 評估：可信度、讀者評價" + r2, 0.7 if round_no == 1 else 0.9, True)
+        with ThreadPoolExecutor(2) as ex:
+            fa = ex.submit(ai.generate_json, "evaluate", base + PART_A, max_tokens=4000)
+            fb = ex.submit(ai.generate_json, "evaluate", base + PART_B, max_tokens=4000)
+            d, gaps = {}, []
+            for f, name in ((fa, "可信度"), (fb, "讀者評價")):
+                try:
+                    part, used = f.result()
+                    d.update(part if isinstance(part, dict) else {})
+                except ValueError:                     # 補救後還是不完整：其他部分照樣用
+                    gaps.append("「%s」這部分 AI 沒寫完整，可以按重新評估再試。" % name)
+        if not d:
+            raise RuntimeError("AI 兩部分都沒寫完整，請再試一次或換一個模型。")
+        prog("AI 評估：綜合判斷" + r2, 0.78 if round_no == 1 else 0.95, True)
+        summary = json.dumps({k: d.get(k) for k in ("book", "credibility", "reception") if d.get(k)}, ensure_ascii=False)
+        knotes = "\n\n".join("[K%d] %s\n%s" % (i, k["label"], k["text"][:500]) for i, k in enumerate(notes, 1)) or "（讀者沒有相關筆記）"
+        try:
+            part, used = ai.generate_json("evaluate", EVAL_RULES + "\n\n" + info + "已整理的評估：\n" + summary + "\n\n讀者的筆記：\n" + knotes + "\n\n" + PART_C, max_tokens=3000)
+            d.update(part if isinstance(part, dict) else {})
+        except ValueError:
+            gaps.append("「綜合判斷」這部分 AI 沒寫完整，可以按重新評估再試。")
+        d["gaps"] = list(d.get("gaps") or []) + gaps
         return d, used, sources
 
     d, used, sources = evaluate(1)
