@@ -12,6 +12,9 @@ from .textutil import chunk_text, fmt_t
 
 def note_text(n):
     parts = []
+    if n.get("book_title"):     # 書的筆記：開頭放書名和章節，問「《某書》第一章」才找得到
+        where = " ".join(x for x in [n.get("chapter") or "", ("p." + n["page"]) if n.get("page") else ""] if x)
+        parts.append("《%s》%s%s 的筆記" % (n["book_title"], (n.get("book_author") and "（%s）" % n["book_author"]) or "", (" " + where) if where else ""))
     if n.get("title"):
         parts.append("標題：" + n["title"])
     if n.get("quote"):
@@ -22,7 +25,7 @@ def note_text(n):
 
 
 def index_note(note_id):
-    n = db.one("SELECT * FROM notes WHERE id = %s", (note_id,))
+    n = db.one("SELECT n.*, b.title AS book_title, b.author AS book_author FROM notes n LEFT JOIN books b ON b.id = n.book_id WHERE n.id = %s", (note_id,))
     if not n:
         return
     pieces = chunk_text(note_text(n), 700) or []
@@ -102,6 +105,36 @@ def search(query, scope="all", k=10):
         "WHERE c.embedding IS NOT NULL AND NOT COALESCE(n.no_index, false) AND " + where + " ORDER BY c.embedding <=> %s::vector LIMIT %s",
         (v,) + args + (v, k))
     return [source_view(r) for r in rows]
+
+
+def search_titles(query, k=12):
+    """問題裡直接提到書名、課名、記事本標題時，把那一項的段落直接拿進候選（不靠向量相似度）"""
+    from .textutil import to_trad
+    q = to_trad(re.sub(r"\s+", "", query))
+    hits = []
+    for b in db.all("SELECT id, title FROM books WHERE title <> ''"):
+        t = to_trad(re.sub(r"\s+", "", b["title"]))
+        if len(t) >= 2 and t in q:
+            hits.append(("c.book_id = %s", b["id"], len(t)))
+    for l in db.all("SELECT id, title, course FROM lectures"):
+        for t in (l["title"], l["course"]):
+            t = to_trad(re.sub(r"\s+", "", t or ""))
+            if len(t) >= 2 and t in q:
+                hits.append(("c.lecture_id = %s", l["id"], len(t)))
+                break
+    for n in db.all("SELECT id, title FROM notes WHERE book_id IS NULL AND title <> '' AND NOT no_index"):
+        t = to_trad(re.sub(r"\s+", "", n["title"]))
+        if len(t) >= 2 and t in q:
+            hits.append(("c.note_id = %s", n["id"], len(t)))
+    out = []
+    for cond, ref, _ in sorted(hits, key=lambda h: -h[2])[:3]:
+        rows = db.all(
+            "SELECT c.id, c.kind, c.book_id, c.note_id, c.lecture_id, c.page, c.chapter, c.t0, c.t1, c.text, "
+            "b.title AS book_title, b.author, l.title AS lecture_title, l.course, n.title AS note_title, 0.5 AS score "
+            "FROM chunks c LEFT JOIN books b ON b.id = c.book_id LEFT JOIN lectures l ON l.id = c.lecture_id LEFT JOIN notes n ON n.id = c.note_id "
+            "WHERE " + cond + " AND NOT COALESCE(n.no_index, false) ORDER BY (c.kind = 'note') DESC, c.id LIMIT %s", (ref, k))
+        out += [source_view(r) for r in rows]
+    return out
 
 
 def source_view(r):

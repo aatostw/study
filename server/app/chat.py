@@ -38,7 +38,9 @@ SYSTEM_KB = (
     "1. 每個論點後面用 [編號] 標出處，可以多個，例如 [2][5]。不要編造編號。\n"
     "2. 資料都沒有提到的，可以用一般知識補充，但要標明「（一般知識）」。\n"
     "3. 書櫃資料和網路說法不同時，主動指出來。\n"
-    "4. 用台灣繁體中文；專有名詞保留原文。條理清楚，可以用短段落或條列，不用 Markdown 標題。")
+    "4. 問到「我記了什麼、我畫了什麼、我的筆記」時，只能用標「（書櫃）」的資料回答，網路資料不能當成他的筆記；"
+    "標題寫著「《書名》…的筆記」或「我的筆記」的段落就是他的筆記，書名簡繁體不同也算同一本。\n"
+    "5. 用台灣繁體中文；專有名詞保留原文。條理清楚，可以用短段落或條列，不用 Markdown 標題。")
 SYSTEM_WEB = (
     "你是使用者的學習助理。根據下面的網路搜尋結果回答，每個論點後面用 [編號] 標出處，不要編造編號；"
     "搜尋結果不夠時可以用一般知識補充，但要標明「（一般知識）」。來源互相矛盾時指出來。"
@@ -79,9 +81,14 @@ def _key(s):
     return "web:" + s["url"] if s["kind"] == "web" else "kb:%s" % (s.get("cid") or s["label"] + s["text"][:40])
 
 
+MINE_RE = re.compile(r"我.{0,24}?(記了|記下|記過|寫了|寫過|畫了|畫線|劃了|劃線|筆記|摘了|摘錄|標了|上過|讀過|心得|重點)")
+
+
 def _rank(query, cands, cited_keys, use_kb):
     """本機重新排名，加權後只留最相關的幾段。排序模型不能用時，退回原本的向量分數。"""
-    scores = engines.rerank(query, [c["text"] for c in cands])
+    # 排名時連標題一起看（「《允許一切發生》第一章 我的筆記」），不然只看內容會認不出是哪本書
+    scores = engines.rerank(query, [c["label"] + "\n" + c["text"] for c in cands])
+    mine = bool(MINE_RE.search(query))      # 問「我記了什麼」：答案一定在自己的資料，網路只能當背景
     ranked = []
     for i, c in enumerate(cands):
         base = scores[i] if scores is not None else float(c.get("score") or 0.5) * (0.97 ** i)
@@ -90,10 +97,14 @@ def _rank(query, cands, cited_keys, use_kb):
             w += 0.08                      # 上一輪真的引用過：跟這段對話有關
         if use_kb and c["kind"] != "web":
             w += 0.05                      # 引用書櫃為主：書櫃資料優先
+        if c.get("named"):
+            w += 0.25 if c["kind"] == "note" else 0.15     # 問題裡直接點名的書／課／筆記（自己的筆記最優先）
+        if mine and c["kind"] == "web":
+            w -= 0.35
         c = dict(c, rel=round(base, 3), weight=round(w, 3))
         ranked.append(c)
     ranked.sort(key=lambda c: -c["weight"])
-    top = [c for c in ranked if c["rel"] >= 0.08 or scores is None][:KEEP]
+    top = [c for c in ranked if c["rel"] >= 0.08 or c.get("named") or scores is None][:KEEP]
     if len(top) < 3:
         top = ranked[:min(3, len(ranked))]
     for c in top:
@@ -113,6 +124,8 @@ def respond(text, history, use_kb=True, use_web=False, prev_pool=None, cited_key
             seen.add(k)
             cands.append(c)
     if use_kb:
+        for s in knowledge.search_titles(search_text):      # 直接點名的書／課／筆記
+            add(dict(s, named=True))
         for s in knowledge.search(search_text, "all", POOL_KB):
             add(s)
     if use_web:

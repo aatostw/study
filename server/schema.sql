@@ -206,3 +206,12 @@ ALTER TABLE chat_msgs ADD COLUMN IF NOT EXISTS pool jsonb;
 
 -- 記事本：可以設成「不放進知識庫」（例如測驗題、草稿），助理和知識複習都不會用到
 ALTER TABLE notes ADD COLUMN IF NOT EXISTS no_index boolean NOT NULL DEFAULT false;
+
+-- 筆記的向量文字加上書名、章節（以前只有內容，問「《某本書》第一章」找不到）：清掉舊向量讓背景重建一次
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM settings WHERE k = 'notes_text_v2') THEN
+    DELETE FROM chunks WHERE note_id IS NOT NULL;
+    INSERT INTO settings (k, v) VALUES ('notes_text_v2', 'true');
+  END IF;
+END $$;
