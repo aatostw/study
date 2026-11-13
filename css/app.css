@@ -494,3 +494,6 @@ h1,h2{color:var(--primary-text)}
 .menu-tile:disabled{opacity:.75}
 .assist-bar .tog{border:0;background:var(--field);border-radius:999px;padding:5px 12px 5px 8px;font-size:13px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
 .assist-bar .tog[aria-pressed="true"]{color:var(--primary-text);font-weight:600}
+.cmp-top{display:flex;align-items:center;gap:8px}
+.cite-tog{border:0;background:var(--field);border-radius:999px;padding:5px 12px 5px 8px;font-size:13px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.cite-tog[aria-pressed="true"]{color:var(--primary-text);font-weight:600}

@@ -34,8 +34,7 @@ function chatModeLabel(){
 
 function renderAssist(){
   let html = '<div class="row between assist-bar"><span class="small muted ellip">' + esc(S.chat ? S.chat.title : "新對話") + "</span>" +
-    '<span class="row"><button class="tog" data-act="cite-toggle" aria-pressed="' + S.showCite + '"><span class="box">' + (S.showCite ? "✓" : "") + "</span>顯示引用</button>" +
-    '<button class="btn ghost sm" data-act="chat-history">🕘 紀錄</button>' +
+    '<span class="row"><button class="btn ghost sm" data-act="chat-history">🕘 紀錄</button>' +
     (S.chat ? '<button class="btn ghost sm" data-act="chat-new">' + ICON.plus + "新對話</button>" : "") + "</span></div>";
 
   const msgs = (S.chat && S.chat.messages) || [];
@@ -49,8 +48,10 @@ function renderAssist(){
   }
   if (S.err.chat) html += '<div class="err">' + esc(S.err.chat) + "</div>";
   const pins = S.chatPins;
-  const pinRow = pins.length ? '<div class="pins">' + pins.map((p, i) => '<span class="pin-chip">' + ({book: "📘", note: "📝", lecture: "🎓"}[p.kind] || "📌") + " " + esc(p.label) +
+  const citeTog = '<div class="cmp-top"><button class="tog cite-tog" data-act="cite-toggle" aria-pressed="' + S.showCite + '"><span class="box">' + (S.showCite ? "✓" : "") + "</span>顯示引用</button></div>";
+  const pinRow0 = pins.length ? '<div class="pins">' + pins.map((p, i) => '<span class="pin-chip">' + ({book: "📘", note: "📝", lecture: "🎓"}[p.kind] || "📌") + " " + esc(p.label) +
       '<button data-act="pin-del" data-i="' + i + '" aria-label="取消指定">✕</button></span>').join("") + "</div>" : "";
+  const pinRow = citeTog + pinRow0;
   if (S.voice){
     html += '<div class="composer voice">' + pinRow + voiceHTML() + '<button class="btn ghost sm" data-act="voice-mode" data-v="0">⌨️ 改用文字</button></div>';
     return html;
