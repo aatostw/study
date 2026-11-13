@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """HTTP API：只聽 127.0.0.1，只接受帶著電腦密碼（X-Study-Key）的請求，也就是 Cloudflare Worker。"""
 import asyncio
+import io
 import hmac
 import json
 import os
@@ -182,8 +183,11 @@ async def cover_photo(bid: int, request: Request, use: int = 0):
         im = covers._img(data)
         im.thumbnail((1200, 1600))
         im.save(covers.path(bid, photo=True), "JPEG", quality=88)
-    except Exception:
-        raise Bad("讀不了這張照片")
+    except Exception as e:
+        head = data[:12]
+        kind = "HEIC" if b"ftyphei" in head or b"ftypmif1" in head or b"ftypheic" in head else "JPEG" if head[:3] == b"\xff\xd8\xff" else "PNG" if head[:4] == b"\x89PNG" else "未知格式"
+        print("  [封面] 讀照片失敗（%s，%d bytes）：%s: %s" % (kind, len(data), type(e).__name__, e), flush=True)
+        raise Bad("讀不了這張照片（%s）：%s" % (kind, str(e)[:120]))
     db.run("UPDATE books SET cover_mode = %s WHERE id = %s", ("photo" if use else "auto", bid))
     return {"ok": True, "job": jobs.add("cover", bid, "找封面《%s》" % b["title"])}
 
@@ -222,6 +226,12 @@ async def identify(request: Request):
     mt = request.headers.get("content-type", "image/jpeg").split(";")[0]
     if not mt.startswith("image/") or not data or len(data) > 15 * 1024 * 1024:
         raise Bad("請上傳照片")
+    try:                                   # HEIC 之類的先轉成 JPEG，AI 才看得懂
+        im = covers._img(data)
+        im.thumbnail((1600, 1600))
+        buf = io.BytesIO(); im.save(buf, "JPEG", quality=88); data, mt = buf.getvalue(), "image/jpeg"
+    except Exception:
+        pass
     d, used = ai.generate_json("ocr", IDENTIFY_PROMPT, images=[(mt, data)], max_tokens=500)
     isbn = re.sub(r"[^0-9Xx]", "", str(d.get("isbn") or "")).upper()
     if isbn and not bookeval.isbn_ok(isbn):

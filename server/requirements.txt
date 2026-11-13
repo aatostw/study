@@ -10,3 +10,4 @@ sentence-transformers>=3.0
 opencc-python-reimplemented>=0.1.7
 pymupdf>=1.24
 trafilatura>=1.12
+pillow-heif>=0.16

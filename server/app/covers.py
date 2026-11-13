@@ -24,6 +24,11 @@ def path(bid, photo=False):
 
 def _img(data):
     from PIL import Image, ImageOps
+    try:                                   # 手機（三星、iPhone）常存成 HEIC／HEIF，Pillow 要外掛才讀得了
+        import pillow_heif
+        pillow_heif.register_heif_opener()
+    except Exception:
+        pass
     im = Image.open(io.BytesIO(data))
     im = ImageOps.exif_transpose(im).convert("RGB")
     return im
