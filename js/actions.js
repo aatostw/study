@@ -170,6 +170,8 @@ const ACT = {
   "mic-cancel": () => REC.stop(true),
   "chat-example": el => chatSend(el.dataset.q),
   "pin-sheet": () => pinSheet(),
+  "chat-balance": el => { S.chatOpts.balance = el.dataset.v; lsSet("chat_balance", el.dataset.v === "kb" ? null : el.dataset.v); render(); },
+  "cite-toggle": () => { S.showCite = !S.showCite; lsSet("show_cite", S.showCite ? null : "0"); document.documentElement.classList.toggle("hide-cite", !S.showCite); render(); },
   "pin-done": () => {
     S.chatPins = [...document.querySelectorAll("#sheet [data-pin]:checked")].map(x => { const [kind, id] = x.dataset.pin.split(":"); return {kind, id: Number(id), label: x.dataset.label}; }).slice(0, 10);
     closeSheet(); render();

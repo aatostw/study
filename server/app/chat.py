@@ -84,7 +84,10 @@ def _key(s):
 MINE_RE = re.compile(r"我.{0,24}?(記了|記下|記過|寫了|寫過|畫了|畫線|劃了|劃線|筆記|摘了|摘錄|標了|上過|讀過|心得|重點)")
 
 
-def _rank(query, cands, cited_keys, use_kb):
+BALANCE = {"kb": (0.05, 0.0), "even": (0.0, 0.0), "web": (0.0, 0.1)}   # (書櫃加分, 網路加分)
+
+
+def _rank(query, cands, cited_keys, use_kb, balance="kb"):
     """本機重新排名，加權後只留最相關的幾段。排序模型不能用時，退回原本的向量分數。"""
     # 排名時連標題一起看（「《允許一切發生》第一章 我的筆記」），不然只看內容會認不出是哪本書
     scores = engines.rerank(query, [c["label"] + "\n" + c["text"] for c in cands])
@@ -95,8 +98,11 @@ def _rank(query, cands, cited_keys, use_kb):
         w = base
         if _key(c) in cited_keys:
             w += 0.08                      # 上一輪真的引用過：跟這段對話有關
+        kb_b, web_b = BALANCE.get(balance, BALANCE["kb"])
         if use_kb and c["kind"] != "web":
-            w += 0.05                      # 引用書櫃為主：書櫃資料優先
+            w += kb_b                      # 書櫃為主：書櫃資料優先
+        if c["kind"] == "web":
+            w += web_b                     # 網路為主：網路資料優先
         if c.get("named"):
             w += 0.25 if c["kind"] == "note" else 0.15     # 問題裡直接點名的書／課／筆記（自己的筆記最優先）
         if mine and c["kind"] == "web":
@@ -112,7 +118,7 @@ def _rank(query, cands, cited_keys, use_kb):
     return top, ranked[:40], scores is not None
 
 
-def respond(text, history, use_kb=True, use_web=False, prev_pool=None, cited_keys=(), pins=None):
+def respond(text, history, use_kb=True, use_web=False, prev_pool=None, cited_keys=(), pins=None, balance="kb"):
     """依照開關回答：書櫃為主／網路搜尋／都不開就直接聊。
     追問時，上一題的候選資料和這題新搜到的合在一起重新排名，只留 6～8 段給 AI。"""
     search_text = text if len(text) >= 16 or not history else history[-1][0] + "\n" + text
@@ -154,7 +160,8 @@ def respond(text, history, use_kb=True, use_web=False, prev_pool=None, cited_key
 
     sources, pool, reranked = [], [], False
     if cands:
-        sources, pool, reranked = _rank(text if not history else search_text, cands, set(cited_keys), use_kb)
+        sources, pool, reranked = _rank(text if not history else search_text, cands, set(cited_keys), use_kb,
+                                        balance if use_web else "kb")
     for i, s in enumerate(sources, 1):
         s["n"] = i
     hist = ""
@@ -169,6 +176,10 @@ def respond(text, history, use_kb=True, use_web=False, prev_pool=None, cited_key
         prompt = (scope_line + "資料（已依相關度排序，越下面越相關；相關度「高」的優先依據，「低」的只在需要時參考）：\n\n"
                   + blocks + "\n\n" + hist + "問題：" + text)
         system = SYSTEM_KB if use_kb else SYSTEM_WEB
+        if use_kb and use_web and balance == "even":
+            system += "\n補充：這次書櫃資料和網路資料同等重要，兩邊都要納入、互相對照。"
+        elif use_kb and use_web and balance == "web":
+            system += "\n補充：這次以網路資料為主來回答，書櫃資料用來對照他自己記過什麼（問「我記了什麼」時仍只能用書櫃資料）。"
     else:
         if pins and not note:
             note = "（指定的範圍裡沒有找到相關資料，以下是一般知識）\n\n"
@@ -184,7 +195,7 @@ def respond(text, history, use_kb=True, use_web=False, prev_pool=None, cited_key
     return {"answer": note + answer, "sources": sources, "model": used, "pool": slim, "reranked": reranked}
 
 
-def send(chat_id, text, scope="all", use_kb=True, use_web=False, pins=None):
+def send(chat_id, text, scope="all", use_kb=True, use_web=False, pins=None, balance="kb"):
     if chat_id:
         chat = db.one("SELECT * FROM chats WHERE id = %s", (chat_id,))
         if not chat:
@@ -219,7 +230,7 @@ def send(chat_id, text, scope="all", use_kb=True, use_web=False, pins=None):
         # 短的追問（「那他怎麼說？」）會帶上一題一起找資料
         r = respond(text, history, use_kb, use_web,
                     prev_pool=(last_ai or {}).get("pool") or [],
-                    cited_keys=[_key(s) for s in ((last_ai or {}).get("sources") or []) if s.get("cited")], pins=pins)
+                    cited_keys=[_key(s) for s in ((last_ai or {}).get("sources") or []) if s.get("cited")], pins=pins, balance=balance if balance in BALANCE else "kb")
         reply = db.one("INSERT INTO chat_msgs (chat_id, role, content, scope, sources, model, pool) VALUES (%s, 'assistant', %s, %s, %s, %s, %s) RETURNING *",
                        (cid, r["answer"], scope, Jsonb(r["sources"]), r["model"], Jsonb(r["pool"])))
     db.run("UPDATE chats SET updated_at = now() WHERE id = %s", (cid,))

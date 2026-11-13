@@ -732,7 +732,8 @@ async def chat_send(request: Request):
         raise Bad("請輸入訊息")
     try:
         r = await asyncio.to_thread(chat.send, int(b.get("chat_id") or 0) or None, text, "all",
-                                    bool(b.get("kb", True)), bool(b.get("web", False)), b.get("pins") or [])
+                                    bool(b.get("kb", True)), bool(b.get("web", False)), b.get("pins") or [],
+                                    s(b.get("balance"), 10) or "kb")
         return dict(r, ok=True)
     except ValueError as e:
         raise Bad(str(e), 404)

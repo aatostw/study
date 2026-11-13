@@ -7,7 +7,9 @@ S.chats = null;           // 對話紀錄
 S.chatPending = null;     // 送出中的那句話
 S.voice = lsGet("voice") === "1";   // 語音模式
 S.chatPins = [];          // 指定：[{kind, id, label}]，跟著這段對話
-S.chatOpts = {kb: lsGet("chat_kb") !== "0", web: lsGet("chat_web") !== "0"};   // 引用書櫃／網路搜尋
+S.chatOpts = {kb: lsGet("chat_kb") !== "0", web: lsGet("chat_web") !== "0", balance: lsGet("chat_balance") || "kb"};
+S.showCite = lsGet("show_cite") !== "0";   // 顯示 [1][2] 引用標號
+document.documentElement.classList.toggle("hide-cite", !S.showCite);   // 引用書櫃／網路搜尋
 S.rec = {state: "idle"};  // idle / rec / stt
 
 async function loadChats(){ S.chats = (await api("/chats")).chats; renderSoon(); }
@@ -40,7 +42,10 @@ function renderAssist(){
     '<button class="tog" data-act="chat-opt" data-k="kb" aria-pressed="' + (o.kb || !!pins.length) + '"' + (pins.length ? " disabled" : "") + '><span class="box">' + (o.kb || pins.length ? "✓" : "") + "</span>" + (pins.length ? "只看指定" : "引用書櫃") + "</button>" +
     '<button class="tog" data-act="chat-opt" data-k="web" aria-pressed="' + o.web + '"><span class="box">' + (o.web ? "✓" : "") + "</span>網路搜尋</button>" +
     '<button class="tog pin" data-act="pin-sheet" aria-pressed="' + !!pins.length + '">📌 指定' + (pins.length ? "（" + pins.length + "）" : "") + "</button>" +
+    '<button class="tog" data-act="cite-toggle" aria-pressed="' + S.showCite + '"><span class="box">' + (S.showCite ? "✓" : "") + "</span>顯示引用</button>" +
     (!o.kb && !o.web && !pins.length ? '<span class="tiny muted">直接聊</span>' : "") + "</div>" +
+    (o.web && (o.kb || pins.length) ? '<div class="bal-seg" role="group" aria-label="比重">' + [["kb", "書櫃為主"], ["even", "平衡"], ["web", "網路為主"]].map(x =>
+      '<button data-act="chat-balance" data-v="' + x[0] + '" aria-pressed="' + (o.balance === x[0]) + '">' + x[1] + "</button>").join("") + "</div>" : "") +
     (pins.length ? '<div class="pins">' + pins.map((p, i) => '<span class="pin-chip">' + ({book: "📘", note: "📝", lecture: "🎓"}[p.kind] || "📌") + " " + esc(p.label) +
       '<button data-act="pin-del" data-i="' + i + '" aria-label="取消指定">✕</button></span>').join("") + "</div>" : "");
   if (S.voice){
@@ -82,7 +87,7 @@ async function chatSend(text){
   if (!text || S.chatPending) return;
   S.chatPending = text; S.chatDraft = ""; S.err.chat = ""; S.chatScroll = true; render();
   try {
-    const r = await api("/chat", {json: {chat_id: S.chat && S.chat.id, message: text, kb: S.chatOpts.kb, web: S.chatOpts.web, pins: S.chatPins}});
+    const r = await api("/chat", {json: {chat_id: S.chat && S.chat.id, message: text, kb: S.chatOpts.kb, web: S.chatOpts.web, pins: S.chatPins, balance: S.chatOpts.balance}});
     if (!S.chat || S.chat.id !== r.chat.id) S.chat = {id: r.chat.id, title: r.chat.title, messages: (S.chat && S.chat.id === r.chat.id) ? S.chat.messages : []};
     S.chat.messages.push(...r.messages);
     if (r.messages.some(m => m.card)){ pollJobs(true); loadBooks(true).then(renderSoon).catch(() => {}); }
