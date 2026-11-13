@@ -34,7 +34,8 @@ function chatModeLabel(){
 
 function renderAssist(){
   let html = '<div class="row between assist-bar"><span class="small muted ellip">' + esc(S.chat ? S.chat.title : "新對話") + "</span>" +
-    '<span class="row"><button class="btn ghost sm" data-act="chat-history">🕘 紀錄</button>' +
+    '<span class="row"><button class="tog" data-act="cite-toggle" aria-pressed="' + S.showCite + '"><span class="box">' + (S.showCite ? "✓" : "") + "</span>顯示引用</button>" +
+    '<button class="btn ghost sm" data-act="chat-history">🕘 紀錄</button>' +
     (S.chat ? '<button class="btn ghost sm" data-act="chat-new">' + ICON.plus + "新對話</button>" : "") + "</span></div>";
 
   const msgs = (S.chat && S.chat.messages) || [];
@@ -82,13 +83,11 @@ function renderAssist(){
 /* 「＋」選單：引用書櫃、網路搜尋、顯示引用、進階 */
 function cmpMenu(){
   const o = S.chatOpts, n = S.chatPins.length;
-  const sw = (k, on, title, sub, dis) => '<button class="menu-sw" data-act="' + k + '"' + (dis ? " disabled" : "") + '><span><b>' + title + '</b><span class="small muted">' + sub + '</span></span><span class="sw' + (on ? " on" : "") + '"></span></button>';
-  openSheet('<h2 style="margin:0">回答方式</h2><div class="stack">' +
-    sw("menu-kb", o.kb || n, n ? "只看指定的資料" : "引用書櫃", n ? "已指定 " + n + " 項，取消指定才會搜整個書櫃" : "翻你的書、筆記、課程，回答會標出處", n) +
-    sw("menu-web", o.web, "網路搜尋", "用電腦上的搜尋引擎找網路資料") +
-    sw("menu-cite", S.showCite, "顯示引用", "回答裡的 [1] [2] 編號") +
+  const tile = (k, on, title, dis) => '<button class="menu-tile" data-act="' + k + '"' + (dis ? " disabled" : "") + '><b>' + title + '</b><span class="sw' + (on ? " on" : "") + '"></span></button>';
+  openSheet('<h2 style="margin:0">回答方式</h2>' +
+    '<div class="tile-row">' + tile("menu-kb", o.kb || n, n ? "只看指定" : "引用書櫃", n) + tile("menu-web", o.web, "網路搜尋") + "</div>" +
     '<button class="menu-sw" data-act="pin-sheet"><span><b>⚙️ 進階</b><span class="small muted">比重（' + {kb: "書櫃為主", even: "平衡", web: "網路為主"}[o.balance] + "）・指定資料" + (n ? "（" + n + " 項）" : "") + '</span></span><span class="chev">›</span></button>' +
-    "</div>" + (!o.kb && !o.web && !n ? '<div class="small muted">兩個都關：直接跟 AI 聊，不查資料。</div>' : ""));
+    (!o.kb && !o.web && !n ? '<div class="small muted">兩個都關：直接跟 AI 聊，不查資料。</div>' : ""));
 }
 
 function msgHTML(m){
