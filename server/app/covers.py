@@ -14,7 +14,7 @@ from . import config, db, engines, websearch
 
 COVER_DIR = os.path.join(config.DATA_DIR, "covers")
 UA = "Mozilla/5.0 (study-server; personal use)"
-MATCH = 0.82            # CLIP 相似度：大於這個才算同一個封面
+MATCH = 0.72            # CLIP 相似度：大於這個才算同一個封面（手機翻拍 vs 網路原圖，同一本約 0.75～0.9）
 
 
 def path(bid, photo=False):
@@ -111,6 +111,7 @@ def find(bid, prog=None):
             imgs.append((src, im))
         if not photo and imgs:          # 沒有照片可以核對：第一張可靠的就用
             break
+    print("  [封面] 《%s》找到 %d 個候選，下載成功 %d 張%s" % (b["title"], len(cands), len(imgs), "，有你拍的照片可以核對" if photo else ""), flush=True)
     if photo and imgs:
         if prog:
             prog("用你拍的照片核對封面", 0.7)

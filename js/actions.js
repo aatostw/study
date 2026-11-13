@@ -33,6 +33,22 @@ function showGate(msg){
   setTimeout(() => { const i = $("#g-pw"); if (i) i.focus(); }, 50);
 }
 
+/* 等某個很快的工作（例如找封面）做完再重新整理：輪詢太慢會錯過它 */
+async function waitJob(id, then){
+  for (let i = 0; i < 40; i++){
+    await new Promise(r => setTimeout(r, 1500));
+    try {
+      const j = ((await api("/jobs?active=1")).jobs || []).find(x => x.id === id);
+      if (!j || j.status === "done" || j.status === "error"){ if (then) await then(j); return j; }
+    } catch (e) {}
+  }
+}
+async function afterCover(j){
+  S.books = null;
+  if (S.sub && S.sub.type === "book") await loadBook().catch(() => {});
+  toast(j && j.status === "error" ? "找封面失敗：" + (j.error || "") : "封面更新了");
+}
+
 /* ---------- 工作進度：有東西在跑就每 3 秒問一次 ---------- */
 let pollTimer = null;
 async function pollJobs(now){
@@ -276,8 +292,8 @@ const ACT = {
   "cover-shoot": () => { const i = $("#pick-cover"); i.dataset.for = "cover"; i.value = ""; i.click(); },
   "cover-lib": () => { const i = $("#pick-cover-lib"); i.dataset.for = "cover"; i.value = ""; i.click(); },
   "cover-mode": el => act("cover", async () => {
-    await api("/books/" + S.sub.id + "/cover", {json: {mode: el.dataset.v}});
-    closeSheet(); toast(el.dataset.v === "text" ? "改成文字封面" : "換封面中，幾秒鐘後會更新"); pollJobs(true);
+    const r = await api("/books/" + S.sub.id + "/cover", {json: {mode: el.dataset.v}});
+    closeSheet(); toast(el.dataset.v === "text" ? "改成文字封面" : "換封面中，幾秒鐘後會更新"); waitJob(r.job && r.job.id, afterCover);
   }),
   "add-sheet": () => addSheet(),
   "import-sheet": () => importSheet(),
@@ -348,7 +364,8 @@ const ACT = {
     if (!body.title && !body.isbn) return toast("請填書名或 ISBN");
     act("wishc", async () => {
       const r = await api("/books", {json: body}); closeSheet(); S.books = null; S.evalOpen = false;
-      if (S.coverPhoto){ const ph = S.coverPhoto; S.coverPhoto = null; api("/books/" + r.book.id + "/cover-photo", {method: "POST", body: ph, headers: {"Content-Type": "image/jpeg"}}).catch(() => {}); }
+      if (S.coverPhoto){ const ph = S.coverPhoto; S.coverPhoto = null; api("/books/" + r.book.id + "/cover-photo", {method: "POST", body: ph, headers: {"Content-Type": "image/jpeg"}}).then(x => waitJob(x.job && x.job.id, afterCover)).catch(() => {}); }
+      else if (r.cover_job) waitJob(r.cover_job.id, async () => { S.books = null; if (S.sub && S.sub.type === "book") await loadBook().catch(() => {}); });
       if (body.evaluate) pollJobs(true);
       go(S.view === "mybooks" ? "mybooks" : "books", {type: "book", id: r.book.id});
     });
@@ -564,8 +581,8 @@ document.addEventListener("change", async e => {
       const f = el.files[0];
       act("cover", async () => {
         const blob = await shrinkImage(f, 1600);
-        await api("/books/" + S.sub.id + "/cover-photo", {method: "POST", body: blob, headers: {"Content-Type": "image/jpeg"}});
-        closeSheet(); toast("用照片核對封面中…"); pollJobs(true);
+        const r = await api("/books/" + S.sub.id + "/cover-photo", {method: "POST", body: blob, headers: {"Content-Type": "image/jpeg"}});
+        closeSheet(); toast("用照片核對封面中…"); waitJob(r.job && r.job.id, afterCover);
       });
     } else coverDone(identifyCover(el.files[0]));
   }

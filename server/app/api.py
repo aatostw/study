@@ -154,7 +154,7 @@ async def book_add(request: Request):
     r = db.one("INSERT INTO books (title, author, isbn, shelf, wish_note) VALUES (%s, %s, %s, %s, %s) RETURNING *",
                (title, author, isbn, shelf, s(b.get("wish_note"), 1000)))
     out = {"ok": True, "book": r}
-    jobs.add("cover", r["id"], "找封面《%s》" % title)
+    out["cover_job"] = jobs.add("cover", r["id"], "找封面《%s》" % title)
     if b.get("evaluate"):
         out["job"] = jobs.add("evaluate", r["id"], "評估《%s》" % title)
     return out
