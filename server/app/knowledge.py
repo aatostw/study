@@ -99,7 +99,7 @@ def search(query, scope="all", k=10):
         "b.title AS book_title, b.author, l.title AS lecture_title, l.course, n.title AS note_title, "
         "1 - (c.embedding <=> %s::vector) AS score "
         "FROM chunks c LEFT JOIN books b ON b.id = c.book_id LEFT JOIN lectures l ON l.id = c.lecture_id LEFT JOIN notes n ON n.id = c.note_id "
-        "WHERE c.embedding IS NOT NULL AND " + where + " ORDER BY c.embedding <=> %s::vector LIMIT %s",
+        "WHERE c.embedding IS NOT NULL AND NOT COALESCE(n.no_index, false) AND " + where + " ORDER BY c.embedding <=> %s::vector LIMIT %s",
         (v,) + args + (v, k))
     return [source_view(r) for r in rows]
 

@@ -203,3 +203,6 @@ CREATE TRIGGER books_auto_reading BEFORE UPDATE OF file_name ON books FOR EACH R
 
 -- 助理：每則回答留下這次的候選資料，追問時跟新搜到的一起重新排名
 ALTER TABLE chat_msgs ADD COLUMN IF NOT EXISTS pool jsonb;
+
+-- 記事本：可以設成「不放進知識庫」（例如測驗題、草稿），助理和知識複習都不會用到
+ALTER TABLE notes ADD COLUMN IF NOT EXISTS no_index boolean NOT NULL DEFAULT false;

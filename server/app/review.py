@@ -61,7 +61,7 @@ def _gather(start, end):
             items.append({"n": len(items) + 1, "kind": kind, "id": ref, "label": label, "text": text})
 
     for n in db.all("SELECT n.*, b.title AS book_title FROM notes n LEFT JOIN books b ON b.id = n.book_id "
-                    "WHERE n.updated_at >= %s AND n.updated_at < %s ORDER BY n.updated_at", (start, end)):
+                    "WHERE n.updated_at >= %s AND n.updated_at < %s AND NOT n.no_index ORDER BY n.updated_at", (start, end)):
         if n["book_id"]:
             where = " ".join(x for x in [n["chapter"], ("p." + n["page"]) if n["page"] else ""] if x)
             add("book", n["book_id"], "《%s》筆記%s" % (n["book_title"], (" " + where) if where else ""),

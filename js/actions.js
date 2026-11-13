@@ -461,6 +461,11 @@ document.addEventListener("change", async e => {
     closeSheet();
     if (!S.sub && !["books", "mybooks"].includes(S.view)) go("books");
   }
+  if (el.id === "note-noindex") act("noidx", async () => {
+    await api("/notes/" + S.sub.id, {method: "PATCH", json: {no_index: el.checked}});
+    S.note.no_index = el.checked; S.notes = null; render();
+    toast(el.checked ? "這則不會放進知識庫" : "這則會放進知識庫");
+  });
   if (el.id === "w-eval"){ const nb = $("#w-note-box"); if (nb) nb.hidden = !el.checked; }
   if ((el.id === "pick-cover" || el.id === "pick-cover-lib") && el.files[0]) coverDone(identifyCover(el.files[0]));
   if (el.id === "pick-evid" && el.files[0]){

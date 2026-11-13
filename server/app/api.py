@@ -271,7 +271,7 @@ async def note_add(bid: int, request: Request):
 
 @app.get("/notes")
 def notebook():
-    rows = db.all("SELECT id, title, left(content, 160) AS preview, starred, created_at, updated_at, "
+    rows = db.all("SELECT id, title, left(content, 160) AS preview, starred, no_index, created_at, updated_at, "
                   "EXISTS (SELECT 1 FROM chunks c WHERE c.note_id = n.id) AS indexed "
                   "FROM notes n WHERE book_id IS NULL ORDER BY updated_at DESC")
     return {"ok": True, "notes": rows}
@@ -315,6 +315,9 @@ async def note_edit(nid: int, request: Request):
     if not cur:
         raise Bad("找不到這則筆記", 404)
     g = lambda k, n: s(b.get(k, cur[k]), n)
+    if "no_index" in b and set(b) <= {"no_index"}:     # 只切換「放不放進知識庫」，不動更新時間
+        r = db.one("UPDATE notes SET no_index = %s WHERE id = %s RETURNING *", (bool(b["no_index"]), nid))
+        return {"ok": True, "note": r}
     r = db.one("UPDATE notes SET title = %s, quote = %s, content = %s, chapter = %s, page = %s, updated_at = now() WHERE id = %s RETURNING *",
                (g("title", 200), g("quote", 8000), g("content", 30000), g("chapter", 200), g("page", 40), nid))
     if not r:
