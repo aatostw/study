@@ -261,7 +261,7 @@ function pinListHTML(){
     if (!open) list = list.slice(0, 3);
     html += '<div class="row between"><div class="label">' + name + "（" + total + "）</div></div><div class=\"stack\">" + list.map(x => {
       const key = x.kind + ":" + x.id, det = u.det[key];
-      return '<div class="pin-row"><label class="pin-main"><input type="checkbox" data-pin="' + key + '"' + (u.sel.has(key) ? " checked" : "") + '><span class="pin-t">' + x.ic + " " + esc(x.label) + "</span></label>" +
+      return '<div class="pin-row"><label class="pin-main"><input type="checkbox" data-pin="' + key + '"' + (u.sel.has(key) ? " checked" : "") + '><span class="pin-t">' + esc(x.label) + "</span></label>" +
         '<button class="pin-det" data-act="pin-det" data-k="' + key + '">' + (det ? "收合" : "展開") + "</button>" +
         (det ? '<div class="pin-sub small muted">' + esc(x.sub || "—") + "</div>" : "") + "</div>";
     }).join("") + "</div>" +
