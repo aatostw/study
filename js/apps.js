@@ -42,3 +42,13 @@ document.addEventListener("click", e => {
   if (e.target.closest && e.target.closest("#brand, #appsw-btn, [data-act=app-switch]")){ e.preventDefault(); e.stopPropagation(); appSwitchOpen(); }
 }, true);
 document.addEventListener("keydown", e => { if (e.key === "Escape") appSwitchClose(); });
+
+/* 上方列太擠時只留 Logo（不要出現「每…」） */
+function brandFit(){
+  const b = document.getElementById("brand"); if (!b) return;
+  b.classList.remove("tight");
+  const n = b.querySelector(".name");
+  if (n && n.scrollWidth > n.clientWidth + 1) b.classList.add("tight");
+}
+new ResizeObserver(brandFit).observe(document.querySelector(".top") || document.body);
+new MutationObserver(() => requestAnimationFrame(brandFit)).observe(document.querySelector(".top") || document.body, {subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["hidden"]});
