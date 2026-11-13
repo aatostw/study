@@ -92,7 +92,8 @@ function setOnline(v){
   const p = $("#pill");
   if (!p) return;
   p.className = "pill " + (v === true ? "ok" : v === false ? "bad" : "");
-  p.textContent = v === true ? "電腦已連線" : v === false ? "連不到電腦" : "連線中";
+  p.textContent = v === false ? "連不到電腦" : "";
+  p.hidden = v !== false;   // 連上了就不顯示，只在連不到時提醒
 }
 function errMsg(e){ return (e && e.message) || String(e); }
 
