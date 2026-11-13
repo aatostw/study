@@ -51,7 +51,7 @@ function renderAssist(){
   const citeTog = '<div class="cmp-top"><button class="tog cite-tog" data-act="cite-toggle" aria-pressed="' + S.showCite + '"><span class="box">' + (S.showCite ? "✓" : "") + "</span>顯示引用</button></div>";
   const pinRow0 = pins.length ? '<div class="pins">' + pins.map((p, i) => '<span class="pin-chip">' + ({book: "📘", note: "📝", lecture: "🎓"}[p.kind] || "📌") + " " + esc(p.label) +
       '<button data-act="pin-del" data-i="' + i + '" aria-label="取消指定">✕</button></span>').join("") + "</div>" : "";
-  const pinRow = citeTog + pinRow0;
+  const pinRow = citeTog;      // 指定的資料不另外顯示標籤，看「＋」旁的模式標籤或「進階」
   if (S.voice){
     html += '<div class="composer voice">' + pinRow + voiceHTML() + '<button class="btn ghost sm" data-act="voice-mode" data-v="0">⌨️ 改用文字</button></div>';
     return html;
