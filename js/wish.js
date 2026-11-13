@@ -55,18 +55,16 @@ function evalSection(b, live){
 
 /* 評估的專屬頁 */
 function renderEval(){
-  const backB = '<button class="back-btn" data-act="back" aria-label="回這本書">' + ICON.back + "</button>";
-  if (!S.book || S.book.book.id !== S.sub.id) return '<div class="page-top">' + backB + "</div>" + loading();
+  if (!S.book || S.book.book.id !== S.sub.id) return pageTop("網路評價") + loading();
   const b = S.book.book, ev = b.evaluation;
   const live = (S.jobs || []).find(j => j.ref_id === b.id && j.kind === "evaluate" && j.status !== "done");
   const running = live && (live.status === "queued" || live.status === "running");
-  let html = '<div class="page-top">' + backB + '<div class="pt-title"><b>網路評價</b><span>《' + esc(b.title) + "》</span></div></div>";
+  let html = pageTop("網路評價", ev ? '<button class="btn soft sm" data-act="read-eval">' + ICON.speaker + "朗讀</button>" +
+      '<button class="btn soft sm" data-act="evaluate" data-id="' + b.id + '"' + (running ? " disabled" : "") + ">" + ICON.spark + "重新評估</button>" +
+      '<button class="btn soft sm" data-act="evid-open">補充資料' + (b.user_evidence ? "（有）" : "") + "</button>" : "");
   if (live) html += jobCard(live);
   if (!ev) return html + evalSection(b, live);
-  html += evalDetail(b, ev);
-  html += '<div class="row wrap"><button class="btn soft" data-act="evaluate" data-id="' + b.id + '"' + (running ? " disabled" : "") + ">" + ICON.spark + "重新評估</button>" +
-    '<button class="btn soft" data-act="evid-open">補充資料' + (b.user_evidence ? "（有）" : "") + "</button></div>";
-  return html;
+  return html + '<div class="stack" id="eval-body" data-read="《' + esc(b.title) + '》網路評價">' + evalDetail(b, ev) + "</div>";
 }
 
 function evalDetail(b, ev){
@@ -74,7 +72,7 @@ function evalDetail(b, ev){
   const L = LIGHT[ev.credibility.light] || LIGHT.unknown, V = VERDICT[ev.verdict.level] || VERDICT.skim;
   html += '<section class="card verdict ' + V[1] + '" data-read="《' + esc(b.title) + '》評估"><div class="row between"><div class="label">結論</div><span class="chip ' + V[1] + '" style="font-size:15px">' + V[0] + "</span></div>" +
     '<p style="margin:0;line-height:1.75">' + evalCite(ev.verdict.text) + "</p>" +
-    (ev.book.summary ? '<div class="small muted">' + evalCite(ev.book.summary) + "</div>" : "") + '<div class="no-read">' + readBtn("朗讀結論") + "</div></section>";
+    (ev.book.summary ? '<div class="small muted">' + evalCite(ev.book.summary) + "</div>" : "") + "</section>";
 
   html += '<section class="card"><div class="row between"><div class="label">可信度（防唬爛）</div><span class="chip ' + L[1] + '">' + L[2] + " " + L[0] + "</span></div>" +
     (ev.credibility.headline ? "<b>" + evalCite(ev.credibility.headline) + "</b>" : "") +

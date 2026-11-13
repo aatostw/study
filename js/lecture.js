@@ -19,7 +19,7 @@ const LANG_NAME = {zh: "中文", en: "英文", auto: "自動"};
 const STATUS = {queued: ["排隊中", ""], processing: ["處理中", "yellow"], ready: ["完成", "green"], error: ["失敗", "red"]};
 
 function renderLectures(){
-  let html = backBtn("書櫃", "books") + '<section class="card"><div class="label">新增影片</div>' +
+  let html = backBtn("書櫃", "books", "影片") + '<section class="card"><div class="label">新增影片</div>' +
     '<button class="btn block green" data-act="pick-lecture">' + ICON.upload + "上傳影片或錄音</button>" +
     '<div class="small muted">檔案直接傳到你的電腦（分塊上傳，沒有大小限制的困擾）。45 分鐘的影片，電腦大約 3～5 分鐘轉好逐字稿。</div>' +
     uploadsHTML("lecture") + "</section>";
@@ -138,7 +138,7 @@ function seek(t){
 }
 
 function renderLecture(){
-  const back = '<button class="btn ghost back" data-act="back">' + ICON.back + (S.view === "lectures" ? "影片" : "書櫃") + "</button>";
+  const back = pageTop("影片");
   if (!S.lecture || S.lecture.lecture.id !== S.sub.id) return back + loading();
   const {lecture: l, segments, job} = S.lecture;
   const live = (S.jobs || []).find(j => j.ref_id === l.id && (j.kind === "lecture" || j.kind === "resummarize") && j.status !== "done") || job;

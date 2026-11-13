@@ -16,7 +16,12 @@ async function loadNote(){
 function starBtn(kind, id, on){
   return '<button class="star' + (on ? " on" : "") + '" data-act="star" data-kind="' + kind + '" data-id="' + id + '" data-on="' + (on ? 1 : 0) + '" aria-label="' + (on ? "取消收藏" : "收藏") + '">' + (on ? "★" : "☆") + "</button>";
 }
-function backBtn(label, view){ return '<button class="btn ghost back" data-act="go" data-v="' + view + '">' + ICON.back + esc(label) + "</button>"; }
+function backBtn(label, view, title){ return pageTop(title || "", "", 'data-act="go" data-v="' + view + '"'); }
+/* 頁首：方形返回＋標題＋右邊的按鈕 */
+function pageTop(title, right, backAttr){
+  return '<div class="page-top"><button class="back-btn" ' + (backAttr || 'data-act="back"') + ' aria-label="返回">' + ICON.back + "</button>" +
+    (title ? '<b class="pt-name">' + esc(title) + "</b>" : "") + (right ? '<span class="pt-acts">' + right + "</span>" : "") + "</div>";
+}
 
 /* ---------- 列表的一列 ---------- */
 const COLS = ["", "green", "yellow"];
@@ -145,7 +150,7 @@ function renderShelf(){
 
 /* ---------- 我的書（全部）---------- */
 function renderMyBooks(){
-  let html = backBtn("書櫃", "books") + '<div class="row"><button class="btn grow" data-act="book-new">' + ICON.plus + "新增一本書</button>" +
+  let html = backBtn("書櫃", "books", "我的書") + '<div class="row"><button class="btn grow" data-act="book-new">' + ICON.plus + "新增一本書</button>" +
     '<button class="btn soft" data-act="pick-book" data-id="">' + ICON.upload + "上傳 PDF／EPUB</button></div>" + uploadsHTML("book");
   if (!S.books) return html + loading();
   const f = S.shelfFilter || "all";
@@ -159,19 +164,17 @@ function renderMyBooks(){
 
 /* ---------- 記事本 ---------- */
 function renderNotebook(){
-  let html = backBtn("書櫃", "books") + '<button class="btn block" data-act="free-new">' + ICON.plus + "寫一則筆記</button>";
+  let html = backBtn("書櫃", "books", "記事本") + '<button class="btn block" data-act="free-new">' + ICON.plus + "寫一則筆記</button>";
   if (!S.notes) return html + loading();
   if (!S.notes.length) return html + '<section class="card"><div class="empty">記事本是空的。<br>寫下想法、貼一段文章，按「朗讀」就能用你的聲音聽。</div></section>';
   return html + '<section class="card"><div class="label">記事本（' + S.notes.length + '）</div><div class="stack">' + S.notes.map(noteRow).join("") + "</div></section>";
 }
 function renderNote(){
-  const backB = '<button class="back-btn" data-act="back" aria-label="回' + (S.view === "books" ? "書櫃" : "記事本") + '">' + ICON.back + "</button>";
-  if (!S.note || S.note.id !== S.sub.id) return '<div class="page-top">' + backB + "</div>" + loading();
+  if (!S.note || S.note.id !== S.sub.id) return pageTop("記事本") + loading();
   const n = S.note;
-  return '<div class="page-top">' + backB + '<span class="grow"></span>' +
-      '<button class="btn soft sm" data-act="read-note">' + ICON.speaker + "朗讀</button>" +
+  return pageTop("記事本", '<button class="btn soft sm" data-act="read-note">' + ICON.speaker + "朗讀</button>" +
       '<button class="btn soft sm" data-act="free-edit">' + ICON.edit + "編輯</button>" +
-      '<button class="btn soft sm" data-act="free-del" style="color:var(--danger)">' + ICON.trash + "刪除</button></div>" +
+      '<button class="btn soft sm" data-act="free-del" style="color:var(--danger)">' + ICON.trash + "刪除</button>") +
     '<section class="card" id="note-card" data-read="' + esc(n.title || "筆記") + '"><div class="row between top"><h2 class="grow" style="margin:0">' + esc(n.title || "（無標題）") + "</h2>" + starBtn("note", n.id, n.starred) + "</div>" +
     '<div class="tiny muted no-read">' + fmtDate(n.updated_at) + (n.no_index ? " · 不放進知識庫" : n.indexed ? "" : " · 建索引中") + "</div>" +
     '<div class="thought">' + esc(n.content) + "</div>" +

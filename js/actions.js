@@ -338,6 +338,7 @@ const ACT = {
   },
 
   /* 朗讀 */
+  "read-eval": () => { const box = $("#eval-body"); if (box) readAloud(readableText(box), box.dataset.read); },
   "read-note": () => { const box = $("#note-card"); if (box) readAloud(readableText(box), box.dataset.read); },
   "read": el => { const box = el.closest("[data-read]"); if (box) readAloud(readableText(box), box.dataset.read); },
   "tts-toggle": () => { const t = S.tts; if (t.playing) TTSP.stop(); else if (t.parts.length){ $("#au").pause(); TTSP.play(Math.max(0, t.i)); } },

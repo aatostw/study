@@ -640,3 +640,10 @@ h1,h2{color:var(--primary-text)}
 .pt-title{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
 .pt-title b{font-size:18px;color:var(--ink)}
 .pt-title span{font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.page-top .pt-name{font-size:18px;color:var(--ink);white-space:nowrap;margin-left:4px}
+.page-top{gap:6px}
+.page-top .btn.sm{padding:0 10px;min-height:38px;white-space:nowrap}
+@media (max-width:400px){.page-top .btn.sm{padding:0 8px;font-size:14px;gap:4px}.page-top .btn.sm svg{width:16px;height:16px}.page-top .pt-name{font-size:17px}}
+#eval-body{gap:inherit}
+.page-top{flex-wrap:wrap;row-gap:8px}
+.page-top .pt-acts{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}

@@ -75,15 +75,13 @@ function jobCard(job){
 
 const CHAT_IC = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-9l-5 4v-4H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" fill="#4C8DF6"/><circle cx="8.5" cy="11" r="1.3" fill="#fff"/><circle cx="12" cy="11" r="1.3" fill="#fff"/><circle cx="15.5" cy="11" r="1.3" fill="#fff"/></svg>';
 function renderBook(){
-  const backB = '<button class="back-btn" data-act="back" aria-label="回' + ({ask: "助理", mybooks: "我的書"}[S.view] || "書櫃") + '">' + ICON.back + "</button>";
-  if (!S.book || S.book.book.id !== S.sub.id) return '<div class="page-top">' + backB + "</div>" + loading();
+  if (!S.book || S.book.book.id !== S.sub.id) return pageTop("我的書") + loading();
   const {book: b, notes, job} = S.book;
   const jobs = S.jobs || [];
   const live = jobs.find(j => j.ref_id === b.id && (j.kind === "bookfile" || j.kind === "analyze") && j.status !== "done") || (job && job.kind !== "evaluate" ? job : null);
   const evLive = jobs.find(j => j.ref_id === b.id && j.kind === "evaluate" && j.status !== "done") || (job && job.kind === "evaluate" ? job : null);
   const sh = b.shelf || "reading";
-  let html = '<div class="page-top">' + backB + '<span class="grow"></span>' +
-    '<button class="btn soft sm" data-act="book-edit">' + ICON.edit + "編輯</button></div>" +
+  let html = pageTop("我的書", '<button class="btn soft sm" data-act="book-edit">' + ICON.edit + "編輯</button>") +
     '<section class="card hero"><div class="row between"><div class="seg shelf-seg" role="group" aria-label="狀態">' +
     ["wish", "reading", "done"].map(v => '<button data-act="shelf-set" data-v="' + v + '" aria-pressed="' + (sh === v) + '">' + SHELF[v] + "</button>").join("") + "</div>" +
     starBtn("book", b.id, b.starred) + "</div>" +
