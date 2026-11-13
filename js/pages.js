@@ -98,10 +98,7 @@ function renderBook(){
   if (live && live.status !== "done") html += jobCard(live);
   html += evalSection(b, evLive && evLive.status !== "done" ? evLive : null);
   if (b.analysis) html += analysisHTML(b.analysis);
-  html += '<section class="card"><div class="label">只問這本書</div><div class="row"><input class="input grow" id="book-q" placeholder="這本書怎麼談…" data-draft="bookq" value="' + esc(S.ask.bookDraft || "") + '">' +
-    '<button class="btn" data-act="ask-book"' + (S.busy.askBook ? " disabled" : "") + ">" + (S.busy.askBook ? '<span class="spinner"></span>' : "問") + "</button></div>" +
-    (S.err.askBook ? '<div class="err">' + esc(S.err.askBook) + "</div>" : "") + "</section>";
-  if (S.ask.book && S.ask.book.bookId === b.id) html += answerHTML(S.ask.book, "book");
+  html += '<button class="btn soft block" data-act="ask-pin" data-kind="book" data-id="' + b.id + '" data-label="' + esc(b.title) + '">💬 問這本書（到助理，只看這本）</button>';
   html += '<section class="card"><div class="label">筆記</div>' + (notes.length ? '<div class="stack">' + notes.map(noteHTML).join("") + "</div>"
     : '<div class="empty">還沒有筆記。打字、貼上，或拍下畫線的那一頁。</div>') + "</section>";
   return html;

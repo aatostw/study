@@ -6,6 +6,7 @@ S.chat = null;            // {id, title, messages:[]}
 S.chats = null;           // 對話紀錄
 S.chatPending = null;     // 送出中的那句話
 S.voice = lsGet("voice") === "1";   // 語音模式
+S.chatPins = [];          // 指定：[{kind, id, label}]，跟著這段對話
 S.chatOpts = {kb: lsGet("chat_kb") !== "0", web: lsGet("chat_web") !== "0"};   // 引用書櫃／網路搜尋
 S.rec = {state: "idle"};  // idle / rec / stt
 
@@ -13,6 +14,7 @@ async function loadChats(){ S.chats = (await api("/chats")).chats; renderSoon();
 async function openChat(id){
   const j = await api("/chats/" + id);
   S.chat = {id: j.chat.id, title: j.chat.title, messages: j.messages};
+  S.chatPins = j.chat.pins || [];
   S.chatScroll = true; render();
 }
 
@@ -29,15 +31,18 @@ function renderAssist(){
   } else {
     html += '<div class="thread">' + msgs.map(msgHTML).join("");
     if (S.chatPending) html += '<div class="msg user"><div class="bubble">' + esc(S.chatPending) + "</div></div>" +
-      '<div class="msg ai"><div class="bubble typing"><span></span><span></span><span></span></div><div class="tiny muted">' + (S.chatOpts.kb && S.chatOpts.web ? "正在翻你的書櫃、上網找資料…" : S.chatOpts.kb ? "正在翻你的書櫃…" : S.chatOpts.web ? "正在上網找資料…" : "思考中…") + "</div></div>";
+      '<div class="msg ai"><div class="bubble typing"><span></span><span></span><span></span></div><div class="tiny muted">' + (S.chatPins.length ? "正在翻你指定的資料…" : S.chatOpts.kb && S.chatOpts.web ? "正在翻你的書櫃、上網找資料…" : S.chatOpts.kb ? "正在翻你的書櫃…" : S.chatOpts.web ? "正在上網找資料…" : "思考中…") + "</div></div>";
     html += "</div>";
   }
   if (S.err.chat) html += '<div class="err">' + esc(S.err.chat) + "</div>";
-  const o = S.chatOpts;
+  const o = S.chatOpts, pins = S.chatPins;
   const scope = '<div class="scope-mini">' +
-    '<button class="tog" data-act="chat-opt" data-k="kb" aria-pressed="' + o.kb + '"><span class="box">' + (o.kb ? "✓" : "") + "</span>引用書櫃為主</button>" +
+    '<button class="tog" data-act="chat-opt" data-k="kb" aria-pressed="' + (o.kb || !!pins.length) + '"' + (pins.length ? " disabled" : "") + '><span class="box">' + (o.kb || pins.length ? "✓" : "") + "</span>" + (pins.length ? "只看指定" : "引用書櫃") + "</button>" +
     '<button class="tog" data-act="chat-opt" data-k="web" aria-pressed="' + o.web + '"><span class="box">' + (o.web ? "✓" : "") + "</span>網路搜尋</button>" +
-    (!o.kb && !o.web ? '<span class="tiny muted">直接聊</span>' : "") + "</div>";
+    '<button class="tog pin" data-act="pin-sheet" aria-pressed="' + !!pins.length + '">📌 指定' + (pins.length ? "（" + pins.length + "）" : "") + "</button>" +
+    (!o.kb && !o.web && !pins.length ? '<span class="tiny muted">直接聊</span>' : "") + "</div>" +
+    (pins.length ? '<div class="pins">' + pins.map((p, i) => '<span class="pin-chip">' + ({book: "📘", note: "📝", lecture: "🎓"}[p.kind] || "📌") + " " + esc(p.label) +
+      '<button data-act="pin-del" data-i="' + i + '" aria-label="取消指定">✕</button></span>').join("") + "</div>" : "");
   if (S.voice){
     html += '<div class="composer voice">' + scope + voiceHTML() + "</div>";
     return html;
@@ -77,7 +82,7 @@ async function chatSend(text){
   if (!text || S.chatPending) return;
   S.chatPending = text; S.chatDraft = ""; S.err.chat = ""; S.chatScroll = true; render();
   try {
-    const r = await api("/chat", {json: {chat_id: S.chat && S.chat.id, message: text, kb: S.chatOpts.kb, web: S.chatOpts.web}});
+    const r = await api("/chat", {json: {chat_id: S.chat && S.chat.id, message: text, kb: S.chatOpts.kb, web: S.chatOpts.web, pins: S.chatPins}});
     if (!S.chat || S.chat.id !== r.chat.id) S.chat = {id: r.chat.id, title: r.chat.title, messages: (S.chat && S.chat.id === r.chat.id) ? S.chat.messages : []};
     S.chat.messages.push(...r.messages);
     if (r.messages.some(m => m.card)){ pollJobs(true); loadBooks(true).then(renderSoon).catch(() => {}); }
@@ -162,4 +167,27 @@ function speakLast(){
   if (!box) return;
   S.voiceSpeaking = true;
   readAloud(readableText(box), "助理的回答");
+}
+
+/* 指定：勾選要問的書、記事本、課程 */
+async function pinSheet(){
+  const draw = () => {
+    const has = (k, id) => S.chatPins.some(p => p.kind === k && p.id === id);
+    const row = (k, id, label, sub, ic) => '<label class="check pin-row"><input type="checkbox" data-pin="' + k + ":" + id + '" data-label="' + esc(label) + '"' + (has(k, id) ? " checked" : "") + '><span><b>' + ic + " " + esc(label) + '</b><span class="small muted">' + esc(sub || "") + "</span></span></label>";
+    const books = (S.books || []).map(b => row("book", b.id, b.title, (b.author ? b.author + " · " : "") + (SHELF[b.shelf] || "") + " · " + b.notes + " 則筆記", "📘")).join("");
+    const notes = (S.notes || []).filter(n => !n.no_index).map(n => row("note", n.id, n.title || "（無標題）", fmtDate(n.updated_at), "📝")).join("");
+    const lecs = (S.lectures || []).map(l => row("lecture", l.id, l.title, l.course, "🎓")).join("");
+    openSheet('<div class="row between"><h2 style="margin:0">指定要問的資料</h2><button class="btn ghost sm" data-act="pin-clear">全部取消</button></div>' +
+      '<div class="small muted">勾選後，助理只在這些裡面找書櫃資料（網路搜尋可以另外開）。只跟著這段對話。</div>' +
+      (!S.books || !S.notes || !S.lectures ? '<div class="row muted"><span class="spinner"></span>載入中…</div>' :
+        (books ? '<div class="label">書</div><div class="stack">' + books + "</div>" : "") +
+        (notes ? '<div class="label">記事本</div><div class="stack">' + notes + "</div>" : "") +
+        (lecs ? '<div class="label">課程</div><div class="stack">' + lecs + "</div>" : "")) +
+      '<button class="btn block" data-act="pin-done">完成</button>');
+  };
+  draw();
+  if (!S.books || !S.notes || !S.lectures){
+    await Promise.all([S.books ? 0 : loadBooks(true), S.notes ? 0 : loadNotebook(true), S.lectures ? 0 : loadLectures().catch(() => {})]).catch(() => {});
+    if (S.sheet) draw();
+  }
 }

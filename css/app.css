@@ -430,3 +430,9 @@ h1,h2{color:var(--primary-text)}
 .rel-hi{background:var(--green-soft);color:var(--green-text)}
 .rel-mid{background:var(--yellow-soft);color:#8a6400}
 .rel-lo{background:var(--field);color:var(--muted)}
+.tog:disabled{opacity:1}
+.tog.pin[aria-pressed="true"]{background:var(--yellow-soft);color:#8a6400;font-weight:700}
+.pins{display:flex;flex-wrap:wrap;gap:6px}
+.pin-chip{display:inline-flex;align-items:center;gap:4px;background:var(--yellow-soft);color:#6b4e00;border-radius:999px;padding:3px 4px 3px 10px;font-size:13px;font-weight:600;max-width:100%}
+.pin-chip button{border:0;background:none;color:inherit;font-size:12px;padding:2px 6px;border-radius:999px}
+.pin-row{padding:8px 12px}

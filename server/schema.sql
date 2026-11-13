@@ -215,3 +215,6 @@ BEGIN
     INSERT INTO settings (k, v) VALUES ('notes_text_v2', 'true');
   END IF;
 END $$;
+
+-- 助理：「指定」的書／筆記／課程，跟著這段對話
+ALTER TABLE chats ADD COLUMN IF NOT EXISTS pins jsonb NOT NULL DEFAULT '[]';

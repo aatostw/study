@@ -88,6 +88,15 @@ def _scope_sql(scope):
         return "c.kind IN ('note', 'book')", ()
     if scope == "lectures":
         return "c.kind = 'lecture'", ()
+    if (scope or "").startswith("pins:"):     # 指定：只在勾選的書／筆記／課程裡找
+        conds, args = [], []
+        col = {"book": "c.book_id", "note": "c.note_id", "lecture": "c.lecture_id"}
+        for item in scope[5:].split(","):
+            m = re.match(r"^(book|note|lecture):(\d+)$", item)
+            if m:
+                conds.append(col[m.group(1)] + " = %s")
+                args.append(int(m.group(2)))
+        return ("(" + " OR ".join(conds) + ")") if conds else "FALSE", tuple(args)
     m = re.match(r"^(book|lecture):(\d+)$", scope or "")
     if m:
         return ("c.book_id = %s" if m.group(1) == "book" else "c.lecture_id = %s"), (int(m.group(2)),)
@@ -128,12 +137,26 @@ def search_titles(query, k=12):
             hits.append(("c.note_id = %s", n["id"], len(t)))
     out = []
     for cond, ref, _ in sorted(hits, key=lambda h: -h[2])[:3]:
-        rows = db.all(
-            "SELECT c.id, c.kind, c.book_id, c.note_id, c.lecture_id, c.page, c.chapter, c.t0, c.t1, c.text, "
-            "b.title AS book_title, b.author, l.title AS lecture_title, l.course, n.title AS note_title, 0.5 AS score "
-            "FROM chunks c LEFT JOIN books b ON b.id = c.book_id LEFT JOIN lectures l ON l.id = c.lecture_id LEFT JOIN notes n ON n.id = c.note_id "
-            "WHERE " + cond + " AND NOT COALESCE(n.no_index, false) ORDER BY (c.kind = 'note') DESC, c.id LIMIT %s", (ref, k))
-        out += [source_view(r) for r in rows]
+        out += _chunks_for(cond, ref, k)
+    return out
+
+
+def _chunks_for(cond, ref, k):
+    rows = db.all(
+        "SELECT c.id, c.kind, c.book_id, c.note_id, c.lecture_id, c.page, c.chapter, c.t0, c.t1, c.text, "
+        "b.title AS book_title, b.author, l.title AS lecture_title, l.course, n.title AS note_title, 0.5 AS score "
+        "FROM chunks c LEFT JOIN books b ON b.id = c.book_id LEFT JOIN lectures l ON l.id = c.lecture_id LEFT JOIN notes n ON n.id = c.note_id "
+        "WHERE " + cond + " AND NOT COALESCE(n.no_index, false) ORDER BY (c.kind = 'note') DESC, c.id LIMIT %s", (ref, k))
+    return [source_view(r) for r in rows]
+
+
+def pinned_chunks(pins, k=8):
+    """指定的每一項先拿幾段（自己的筆記優先），保證一定在候選裡"""
+    col = {"book": "c.book_id = %s", "note": "c.note_id = %s", "lecture": "c.lecture_id = %s"}
+    out = []
+    for p in pins[:10]:
+        if p.get("kind") in col:
+            out += _chunks_for(col[p["kind"]], int(p["id"]), k)
     return out
 
 

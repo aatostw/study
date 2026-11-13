@@ -169,7 +169,19 @@ const ACT = {
   "mic": () => { if (S.rec.state === "rec") REC.stop(); else if (S.rec.state === "idle" && !S.chatPending) REC.start(); },
   "mic-cancel": () => REC.stop(true),
   "chat-example": el => chatSend(el.dataset.q),
-  "chat-new": () => { closeSheet(); S.chat = null; S.err.chat = ""; render(); const q = $("#chat-in"); if (q) q.focus(); },
+  "pin-sheet": () => pinSheet(),
+  "pin-done": () => {
+    S.chatPins = [...document.querySelectorAll("#sheet [data-pin]:checked")].map(x => { const [kind, id] = x.dataset.pin.split(":"); return {kind, id: Number(id), label: x.dataset.label}; }).slice(0, 10);
+    closeSheet(); render();
+  },
+  "pin-clear": () => { document.querySelectorAll("#sheet [data-pin]").forEach(x => x.checked = false); },
+  "pin-del": el => { S.chatPins.splice(Number(el.dataset.i), 1); render(); },
+  "ask-pin": el => {
+    closeSheet(); S.chat = null; S.err.chat = ""; S.assist = null;
+    S.chatPins = [{kind: el.dataset.kind, id: Number(el.dataset.id), label: el.dataset.label}];
+    go("ask"); setTimeout(() => { const q = $("#chat-in"); if (q) q.focus(); }, 300);
+  },
+  "chat-new": () => { closeSheet(); S.chat = null; S.chatPins = []; S.err.chat = ""; render(); const q = $("#chat-in"); if (q) q.focus(); },
   "chat-history": () => { chatHistorySheet(); loadChats().then(() => { if (S.sheet) chatHistorySheet(); }).catch(() => {}); },
   "chat-open": el => { closeSheet(); openChat(Number(el.dataset.id)).catch(e => toast(errMsg(e))); },
   "chat-del": async el => {

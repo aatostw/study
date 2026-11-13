@@ -112,7 +112,7 @@ def _rank(query, cands, cited_keys, use_kb):
     return top, ranked[:40], scores is not None
 
 
-def respond(text, history, use_kb=True, use_web=False, prev_pool=None, cited_keys=()):
+def respond(text, history, use_kb=True, use_web=False, prev_pool=None, cited_keys=(), pins=None):
     """依照開關回答：書櫃為主／網路搜尋／都不開就直接聊。
     追問時，上一題的候選資料和這題新搜到的合在一起重新排名，只留 6～8 段給 AI。"""
     search_text = text if len(text) >= 16 or not history else history[-1][0] + "\n" + text
@@ -123,10 +123,17 @@ def respond(text, history, use_kb=True, use_web=False, prev_pool=None, cited_key
         if k not in seen:
             seen.add(k)
             cands.append(c)
-    if use_kb:
+    scope = "all"
+    if pins:                                             # 指定：只在勾選的項目裡找
+        use_kb = True
+        scope = "pins:" + ",".join("%s:%d" % (p["kind"], int(p["id"])) for p in pins)
+        for s in knowledge.pinned_chunks(pins):
+            add(dict(s, named=True))
+    elif use_kb:
         for s in knowledge.search_titles(search_text):      # 直接點名的書／課／筆記
             add(dict(s, named=True))
-        for s in knowledge.search(search_text, "all", POOL_KB):
+    if use_kb:
+        for s in knowledge.search(search_text, scope, POOL_KB):
             add(s)
     if use_web:
         try:
@@ -134,8 +141,15 @@ def respond(text, history, use_kb=True, use_web=False, prev_pool=None, cited_key
                 add(s)
         except Exception as e:
             note = "（網路搜尋現在連不到：%s）\n\n" % e
-    for c in prev_pool or []:      # 上一題的候選，照這次的開關過濾
-        if (c["kind"] == "web" and use_web) or (c["kind"] != "web" and use_kb):
+    pin_ok = None
+    if pins:
+        pin_ok = {(p["kind"], int(p["id"])) for p in pins}
+    for c in prev_pool or []:      # 上一題的候選，照這次的開關和指定範圍過濾
+        if c["kind"] == "web":
+            if use_web:
+                add(c)
+        elif use_kb and (pin_ok is None or ("book", c.get("book_id")) in pin_ok or ("note", c.get("note_id")) in pin_ok
+                         or ("lecture", c.get("lecture_id")) in pin_ok):
             add(c)
 
     sources, pool, reranked = [], [], False
@@ -151,11 +165,14 @@ def respond(text, history, use_kb=True, use_web=False, prev_pool=None, cited_key
         # 最相關的放最後、最靠近問題（模型對開頭和結尾讀得最仔細）
         blocks = "\n\n".join("[%d]（相關度：%s）%s%s\n%s" % (s["n"], s["level"], "（網路）" if s["kind"] == "web" else "（書櫃）", s["label"], s["text"])
                              for s in reversed(sources))
-        prompt = ("資料（已依相關度排序，越下面越相關；相關度「高」的優先依據，「低」的只在需要時參考）：\n\n"
+        scope_line = ("使用者指定只看這些：%s。書櫃資料只來自它們。\n\n" % "、".join(p.get("label") or "" for p in pins)) if pins else ""
+        prompt = (scope_line + "資料（已依相關度排序，越下面越相關；相關度「高」的優先依據，「低」的只在需要時參考）：\n\n"
                   + blocks + "\n\n" + hist + "問題：" + text)
         system = SYSTEM_KB if use_kb else SYSTEM_WEB
     else:
-        if use_kb and not use_web and not note:
+        if pins and not note:
+            note = "（指定的範圍裡沒有找到相關資料，以下是一般知識）\n\n"
+        elif use_kb and not use_web and not note:
             note = "（書櫃裡沒有找到相關資料，以下是一般知識）\n\n"
         prompt = hist + "問題：" + text
         system = SYSTEM_FREE
@@ -167,7 +184,7 @@ def respond(text, history, use_kb=True, use_web=False, prev_pool=None, cited_key
     return {"answer": note + answer, "sources": sources, "model": used, "pool": slim, "reranked": reranked}
 
 
-def send(chat_id, text, scope="all", use_kb=True, use_web=False):
+def send(chat_id, text, scope="all", use_kb=True, use_web=False, pins=None):
     if chat_id:
         chat = db.one("SELECT * FROM chats WHERE id = %s", (chat_id,))
         if not chat:
@@ -177,7 +194,10 @@ def send(chat_id, text, scope="all", use_kb=True, use_web=False):
     cid = chat["id"]
     prev = db.all("SELECT role, content, pool, sources FROM chat_msgs WHERE chat_id = %s ORDER BY id DESC LIMIT 6", (cid,))[::-1]
     last_ai = next((m for m in reversed(prev) if m["role"] == "assistant"), None)
-    scope = ("kb" if use_kb else "") + ("+web" if use_web else "") or "free"
+    pins = [{"kind": p["kind"], "id": int(p["id"]), "label": str(p.get("label") or "")[:80]}
+            for p in (pins or []) if p.get("kind") in ("book", "note", "lecture") and str(p.get("id", "")).isdigit()][:10]
+    db.run("UPDATE chats SET pins = %s WHERE id = %s", (Jsonb(pins), cid))
+    scope = ("pins" if pins else "kb" if use_kb else "") + ("+web" if use_web else "") or "free"
     user = db.one("INSERT INTO chat_msgs (chat_id, role, content, scope) VALUES (%s, 'user', %s, %s) RETURNING *", (cid, text, scope))
 
     title = _eval_title(text)
@@ -199,15 +219,15 @@ def send(chat_id, text, scope="all", use_kb=True, use_web=False):
         # 短的追問（「那他怎麼說？」）會帶上一題一起找資料
         r = respond(text, history, use_kb, use_web,
                     prev_pool=(last_ai or {}).get("pool") or [],
-                    cited_keys=[_key(s) for s in ((last_ai or {}).get("sources") or []) if s.get("cited")])
+                    cited_keys=[_key(s) for s in ((last_ai or {}).get("sources") or []) if s.get("cited")], pins=pins)
         reply = db.one("INSERT INTO chat_msgs (chat_id, role, content, scope, sources, model, pool) VALUES (%s, 'assistant', %s, %s, %s, %s, %s) RETURNING *",
                        (cid, r["answer"], scope, Jsonb(r["sources"]), r["model"], Jsonb(r["pool"])))
     db.run("UPDATE chats SET updated_at = now() WHERE id = %s", (cid,))
-    return {"chat": {"id": cid, "title": chat["title"]}, "messages": [_msg(user), _msg(reply)]}
+    return {"chat": {"id": cid, "title": chat["title"], "pins": pins}, "messages": [_msg(user), _msg(reply)]}
 
 
 def get(cid):
-    chat = db.one("SELECT id, title, created_at, updated_at FROM chats WHERE id = %s", (cid,))
+    chat = db.one("SELECT id, title, pins, created_at, updated_at FROM chats WHERE id = %s", (cid,))
     if not chat:
         return None
     msgs = [_msg(m) for m in db.all("SELECT * FROM chat_msgs WHERE chat_id = %s ORDER BY id", (cid,))]
