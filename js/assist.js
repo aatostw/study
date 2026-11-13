@@ -85,7 +85,8 @@ function renderAssist(){
 function cmpMenu(){
   const o = S.chatOpts, n = S.chatPins.length;
   const tile = (k, on, title, dis) => '<button class="menu-tile" data-act="' + k + '"' + (dis ? " disabled" : "") + '><b>' + title + '</b><span class="sw' + (on ? " on" : "") + '"></span></button>';
-  openSheet('<h2 style="margin:0">回答方式</h2>' +
+  openSheet('<div class="row" style="gap:10px"><h2 style="margin:0">回答方式</h2>' +
+    (n ? '<button class="part-chip" data-act="pin-sheet" title="' + esc(S.chatPins.map(p => p.label).join("、")) + '">📌 部分引用（' + n + " 項）</button>" : "") + "</div>" +
     '<div class="tile-row">' + tile("menu-kb", o.kb || n, n ? "只看指定" : "引用書櫃", n) + tile("menu-web", o.web, "網路搜尋") + "</div>" +
     '<button class="menu-sw" data-act="pin-sheet"><span><b>⚙️ 進階</b><span class="small muted">比重（' + {kb: "書櫃為主", even: "平衡", web: "網路為主"}[o.balance] + "）・指定資料" + (n ? "（" + n + " 項）" : "") + '</span></span><span class="chev">›</span></button>' +
     (!o.kb && !o.web && !n ? '<div class="small muted">兩個都關：直接跟 AI 聊，不查資料。</div>' : ""));
