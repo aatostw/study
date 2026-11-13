@@ -544,7 +544,7 @@ document.addEventListener("click", e => {
 document.addEventListener("input", e => {
   const el = e.target, d = el.dataset && el.dataset.draft;
   if (d === "ask") S.ask.draft = el.value;
-  else if (el.id === "shelf-q"){ S.shelfQ = el.value; const g = $("#shelf-grid"); if (g){ g.innerHTML = shelfGridHTML(); loadCovers(); } }
+  else if (el.id === "shelf-q"){ S.shelfQ = el.value; el.parentNode.classList.toggle("has-q", !!el.value); const g = $("#shelf-grid"); if (g){ g.innerHTML = shelfGridHTML(); loadCovers(); } }
   else if (el.id === "pin-q"){ S.pinUI.q = el.value; pinRedraw(); }
   else if (d === "chat"){
     S.chatDraft = el.value; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 160) + "px";

@@ -121,14 +121,14 @@ async function loadShelf(){
   render();
 }
 function renderShelf(){
-  let html = '<div class="shelf-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>' +
-    '<input id="shelf-q" placeholder="搜尋書名、作者、筆記、影片" value="' + esc(S.shelfQ) + '" autocomplete="off"></div>' +
-    '<div class="row between shelf-head"><h1>書櫃</h1><span class="row">' +
-    (S.sel ? '<button class="hbtn" data-act="sel-toggle">完成</button>'
-      : '<button class="hbtn" data-act="add-sheet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8" stroke-linecap="round"/></svg>新增</button>' +
-        '<button class="hbtn" data-act="sel-toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.8 2.8L16.5 9.5" stroke-linecap="round" stroke-linejoin="round"/></svg>選擇</button>') +
-    "</span></div>" +
-    '<div class="shelf-tabs">' + [["book", "我的書"], ["note", "記事本"], ["lecture", "影片"]].map(o => '<button data-act="shelf-tab" data-v="' + o[0] + '" aria-pressed="' + (S.shelfTab === o[0]) + '">' + o[1] + "</button>").join("") + "</div>" +
+  const btns = S.sel ? '<button class="hbtn" data-act="sel-toggle">完成</button>'
+    : '<button class="hbtn" data-act="add-sheet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8" stroke-linecap="round"/></svg>新增</button>' +
+      '<button class="hbtn" data-act="sel-toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.8 2.8L16.5 9.5" stroke-linecap="round" stroke-linejoin="round"/></svg>選擇</button>';
+  let html = '<div class="shelf-head"><h1>書櫃</h1>' +
+    '<label class="shelf-search' + (S.shelfQ ? " has-q" : "") + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>' +
+    '<input id="shelf-q" placeholder="搜尋" aria-label="搜尋書名、作者、筆記、影片" value="' + esc(S.shelfQ) + '" autocomplete="off"></label></div>' +
+    '<div class="shelf-tabrow"><div class="shelf-tabs">' + [["book", "我的書"], ["note", "記事本"], ["lecture", "影片"]].map(o => '<button data-act="shelf-tab" data-v="' + o[0] + '" aria-pressed="' + (S.shelfTab === o[0]) + '">' + o[1] + "</button>").join("") + "</div>" +
+    '<span class="shelf-btns">' + btns + "</span></div>" +
     uploadsHTML("book") + uploadsHTML("lecture");
   const active = (S.jobs || []).filter(j => (j.status === "queued" || j.status === "running") && j.kind !== "cover");
   if (active.length) html += '<section class="card"><div class="label">電腦正在處理</div><div class="stack">' + active.map(j => '<div class="stack" style="gap:4px"><b class="small">' + esc(j.title) + "</b>" + jobCard(j) + "</div>").join("") + "</div></section>";

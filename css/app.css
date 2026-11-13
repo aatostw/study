@@ -588,3 +588,16 @@ h1,h2{color:var(--primary-text)}
 .page-top .back-btn svg{width:20px;height:20px}
 .page-top .btn.sm{gap:6px}
 .chat-ic svg{width:18px;height:18px;display:block}
+
+/* 書櫃：標題＋小搜尋；分頁＋新增/選擇 */
+.shelf-head{display:flex;align-items:center;gap:12px}
+.shelf-head h1{flex:1}
+.shelf-head .shelf-search{width:20%;min-width:84px;height:38px;padding:0 12px;gap:6px;cursor:text;transition:width .2s}
+.shelf-head .shelf-search svg{width:17px;height:17px}
+.shelf-head .shelf-search input{font-size:16px}
+.shelf-head .shelf-search:focus-within,.shelf-head .shelf-search.has-q{width:62%}
+.shelf-tabrow{display:flex;align-items:center;border-bottom:1px solid var(--line);flex:none}
+.shelf-tabrow .shelf-tabs{flex:1;min-width:0;border-bottom:0}
+.shelf-btns{display:flex;flex:none;margin-top:-2px}
+.shelf-btns .hbtn{padding:6px 2px 6px 10px;font-size:15px}
+.shelf-btns .hbtn svg{width:18px;height:18px}
