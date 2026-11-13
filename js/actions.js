@@ -172,8 +172,11 @@ const ACT = {
     if (v.trim()) return chatSend(v);
     S.voice = true; lsSet("voice", "1"); render();           // 黑色按鈕：沒有字就進入語音對話
   },
-  "cmp-mic": () => { if (S.rec.state === "rec") REC.stop(); else if (S.rec.state === "idle" && !S.chatPending) REC.start("dictate"); },
+  "cmp-mic": () => { if (S.rec.state === "idle" && !S.chatPending) REC.start("dictate"); },
   "cmp-menu": () => cmpMenu(),
+  "rec-cancel": () => { if (S.rec.state === "rec") REC.stop(true); else if (S.rec.state === "stt"){ REC.cancel = true; } },
+  "rec-stop": () => { if (S.rec.state === "rec") REC.stop(false, "draft"); },
+  "rec-send": () => { if (S.rec.state === "rec") REC.stop(false, "send"); },
   "menu-kb": () => { S.chatOpts.kb = !S.chatOpts.kb; lsSet("chat_kb", S.chatOpts.kb ? null : "0"); cmpMenu(); render(); },
   "menu-web": () => { S.chatOpts.web = !S.chatOpts.web; lsSet("chat_web", S.chatOpts.web ? null : "0"); cmpMenu(); render(); },
   "menu-cite": () => { ACT["cite-toggle"](); cmpMenu(); },
@@ -585,6 +588,6 @@ document.addEventListener("pointerdown", e => {
 document.addEventListener("pointermove", e => { if (PTT.timer && Math.hypot(e.clientX - PTT.x, e.clientY - PTT.y) > 12){ clearTimeout(PTT.timer); PTT.timer = 0; } });
 ["pointerup", "pointercancel"].forEach(ev => document.addEventListener(ev, () => {
   clearTimeout(PTT.timer); PTT.timer = 0;
-  if (PTT.on){ PTT.on = false; if (S.rec.state === "rec") REC.stop(); }
+  if (PTT.on){ PTT.on = false; if (S.rec.state === "rec") REC.stop(false, "send"); }
 }));
 document.addEventListener("contextmenu", e => { if (e.target.id === "chat-in" && (PTT.on || PTT.timer)) e.preventDefault(); });

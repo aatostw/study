@@ -59,6 +59,15 @@ function renderAssist(){
   let act;
   if (S.chatPending) act = '<button class="cmp-act" disabled aria-label="回答中"><span class="spinner" style="width:18px;height:18px;border-color:#fff4;border-top-color:#fff"></span></button>';
   else act = '<button class="cmp-act" data-act="cmp-act" aria-label="' + (draft.trim() ? "送出" : "語音對話") + '">' + (draft.trim() ? SEND : WAVE) + "</button>";
+  if (S.recMode !== "voice" && (rec === "rec" || rec === "stt")){
+    html += '<div class="composer">' + pinRow + '<div class="cmp recbar">' +
+      '<button class="cmp-btn" data-act="rec-cancel" aria-label="取消">✕</button>' +
+      (rec === "rec" ? '<div class="wave" id="wave"></div>' : '<div class="rec-msg">正在轉錄…</div>') +
+      (rec === "rec" ? '<button class="rec-stop" data-act="rec-stop" aria-label="停止，文字放進輸入框"><span></span></button>'
+        : '<span class="rec-spin"><span class="spinner" style="width:20px;height:20px"></span></span>') +
+      '<button class="cmp-act send" data-act="rec-send" aria-label="直接送出"' + (rec === "stt" ? " disabled" : "") + ">" + SEND + "</button></div></div>";
+    return html;
+  }
   html += '<div class="composer">' + pinRow +
     '<div class="cmp' + (open ? " open" : "") + (draft.trim() ? " has-text" : "") + (rec === "rec" && S.recMode !== "voice" ? " recording" : "") + '" id="cmp">' +
       '<textarea id="chat-in" rows="1" data-draft="chat" placeholder="' + (rec === "rec" ? (S.recMode === "ptt" ? "正在聽…放開就送出" : "正在聽…再按麥克風結束") : rec === "stt" ? "聽寫中…" : open ? "回覆助理…" : "回覆或長按說話") + '">' + esc(draft) + "</textarea>" +
@@ -146,7 +155,7 @@ function voiceHTML(){
 }
 
 const REC = {
-  mr: null, chunks: [], stream: null, timer: 0, cancel: false,
+  mr: null, chunks: [], stream: null, timer: 0, cancel: false, then: "", ac: null, levels: [], wtimer: 0,
   async start(mode){
     S.recMode = mode || "voice";       // voice：語音對話；dictate：聽寫到輸入框；ptt：長按說話，放開就送出
     TTSP.stop(); S.voiceSpeaking = false;
@@ -159,7 +168,9 @@ const REC = {
     REC.mr.ondataavailable = e => { if (e.data && e.data.size) REC.chunks.push(e.data); };
     REC.mr.onstop = () => REC.done();
     REC.mr.start();
+    REC.then = S.recMode === "ptt" ? "send" : "";
     S.rec = {state: "rec", start: Date.now()}; render();
+    REC.meter();
     if (navigator.vibrate) navigator.vibrate(30);
     clearInterval(REC.timer);
     REC.timer = setInterval(() => {
@@ -169,7 +180,30 @@ const REC = {
       if (Date.now() - S.rec.start > 180000) REC.stop();          // 最多 3 分鐘
     }, 500);
   },
-  stop(cancel){
+  /* 音量波形：每 70ms 量一次音量，從右邊長出一根直條 */
+  meter(){
+    REC.levels = [];
+    clearInterval(REC.wtimer);
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      REC.ac = new AC();
+      const src = REC.ac.createMediaStreamSource(REC.stream), an = REC.ac.createAnalyser();
+      an.fftSize = 512; src.connect(an);
+      const buf = new Uint8Array(an.fftSize);
+      REC.wtimer = setInterval(() => {
+        an.getByteTimeDomainData(buf);
+        let sum = 0; for (const v of buf){ const x = (v - 128) / 128; sum += x * x; }
+        REC.levels.push(Math.min(1, Math.sqrt(sum / buf.length) * 4.5));
+        if (REC.levels.length > 90) REC.levels.shift();
+        const w = $("#wave");
+        if (w) w.innerHTML = REC.levels.map(l => '<i style="height:' + Math.max(10, Math.round(l * 100)) + '%"></i>').join("");
+      }, 70);
+    } catch (e) {}
+  },
+  stop(cancel, then){
+    if (then) REC.then = then;
+    clearInterval(REC.wtimer);
+    if (REC.ac){ REC.ac.close().catch(() => {}); REC.ac = null; }
     clearInterval(REC.timer);
     REC.cancel = !!cancel;
     if (REC.mr && REC.mr.state !== "inactive") REC.mr.stop();
@@ -183,12 +217,15 @@ const REC = {
     try {
       const r = await api("/stt", {method: "POST", body: blob, headers: {"Content-Type": blob.type.split(";")[0] || "audio/webm"}});
       S.rec = {state: "idle"};
-      if (S.recMode === "dictate"){
+      if (REC.cancel){ render(); return; }          // 轉錄中按了 ✕
+      if (S.recMode !== "voice" && REC.then !== "send"){
         S.chatDraft = (S.chatDraft ? S.chatDraft.replace(/\s+$/, "") + " " : "") + r.text; S.cmpOpen = true; render();
         const q = $("#chat-in"); if (q){ q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
         return;
       }
-      await chatSend(r.text);
+      const text = S.recMode === "voice" ? r.text : (S.chatDraft ? S.chatDraft.replace(/\s+$/, "") + " " : "") + r.text;
+      if (S.recMode !== "voice"){ S.chatDraft = ""; S.cmpOpen = false; }
+      await chatSend(text);
       if (S.recMode === "voice") speakLast();
     } catch (e) { S.rec = {state: "idle"}; render(); if (!e.relogin) toast(errMsg(e)); }
   }
