@@ -653,7 +653,16 @@ document.addEventListener("change", async e => {
     S.busy.ocr = false; render();
   }
 });
-function growTA(t){ t.style.height = "auto"; t.style.height = t.scrollHeight + 2 + "px"; }
+/* 輸入框跟著內容長高：先記住捲動位置再量，畫面才不會跳 */
+const FIELD_SIZING = typeof CSS !== "undefined" && CSS.supports && CSS.supports("field-sizing", "content");
+function growTA(t){
+  if (FIELD_SIZING) return;
+  const m = $("#main"), top = m.scrollTop, h = t.offsetHeight;
+  t.style.minHeight = h + "px"; t.style.height = "auto";          // 用 min-height 撐住，量的時候版面不會縮
+  const want = Math.max(t.scrollHeight + 2, 240);
+  t.style.height = want + "px"; t.style.minHeight = "";
+  m.scrollTop = top;
+}
 document.addEventListener("input", e => {
   if ((e.target.id === "f-content" || e.target.id === "f-title") && S.noteEdit && $(".note-edit")){
     S.noteDraft = {title: $("#f-title").value, content: $("#f-content").value};
