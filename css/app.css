@@ -440,3 +440,9 @@ h1,h2{color:var(--primary-text)}
 .bal-seg{display:flex;gap:2px;background:var(--field);border-radius:999px;padding:3px;width:max-content;max-width:100%}
 .bal-seg button{border:0;background:none;border-radius:999px;padding:4px 12px;font-size:12.5px;color:var(--muted)}
 .bal-seg button[aria-pressed="true"]{background:var(--surface);color:var(--primary-text);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.pin-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:4px 8px;background:var(--field);border-radius:12px;padding:8px 10px}
+.pin-main{display:flex;align-items:center;gap:10px;min-width:0;cursor:pointer}
+.pin-main input{width:20px;height:20px;flex:none;accent-color:var(--primary)}
+.pin-t{font-weight:700;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pin-det{border:0;background:var(--surface);border-radius:8px;padding:3px 10px;font-size:12.5px;color:var(--primary-text)}
+.pin-sub{grid-column:1 / -1;padding-left:30px}

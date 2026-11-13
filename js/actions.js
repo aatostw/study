@@ -170,13 +170,25 @@ const ACT = {
   "mic-cancel": () => REC.stop(true),
   "chat-example": el => chatSend(el.dataset.q),
   "pin-sheet": () => pinSheet(),
-  "chat-balance": el => { S.chatOpts.balance = el.dataset.v; lsSet("chat_balance", el.dataset.v === "kb" ? null : el.dataset.v); render(); },
+  "chat-balance": el => {
+    S.chatOpts.balance = el.dataset.v; lsSet("chat_balance", el.dataset.v === "kb" ? null : el.dataset.v);
+    document.querySelectorAll("#sheet [data-act=chat-balance]").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === el.dataset.v));
+    render();
+  },
   "cite-toggle": () => { S.showCite = !S.showCite; lsSet("show_cite", S.showCite ? null : "0"); document.documentElement.classList.toggle("hide-cite", !S.showCite); render(); },
   "pin-done": () => {
-    S.chatPins = [...document.querySelectorAll("#sheet [data-pin]:checked")].map(x => { const [kind, id] = x.dataset.pin.split(":"); return {kind, id: Number(id), label: x.dataset.label}; }).slice(0, 10);
+    const all = pinItems(), flat = [...all.book, ...all.note, ...all.lecture];
+    S.chatPins = flat.filter(x => S.pinUI.sel.has(x.kind + ":" + x.id)).map(x => ({kind: x.kind, id: x.id, label: x.label})).slice(0, 30);
     closeSheet(); render();
   },
-  "pin-clear": () => { document.querySelectorAll("#sheet [data-pin]").forEach(x => x.checked = false); },
+  "pin-all": () => {
+    const q = S.pinUI.q.trim().toLowerCase(), all = pinItems();
+    [...all.book, ...all.note, ...all.lecture].filter(x => !q || (x.label + " " + x.sub).toLowerCase().includes(q)).forEach(x => S.pinUI.sel.add(x.kind + ":" + x.id));
+    pinRedraw();
+  },
+  "pin-clear": () => { S.pinUI.sel.clear(); pinRedraw(); },
+  "pin-more": el => { S.pinUI.more[el.dataset.k] = !S.pinUI.more[el.dataset.k]; pinRedraw(); },
+  "pin-det": el => { S.pinUI.det[el.dataset.k] = !S.pinUI.det[el.dataset.k]; pinRedraw(); },
   "pin-del": el => { S.chatPins.splice(Number(el.dataset.i), 1); render(); },
   "ask-pin": el => {
     closeSheet(); S.chat = null; S.err.chat = ""; S.assist = null;
@@ -446,6 +458,7 @@ document.addEventListener("click", e => {
 document.addEventListener("input", e => {
   const el = e.target, d = el.dataset && el.dataset.draft;
   if (d === "ask") S.ask.draft = el.value;
+  else if (el.id === "pin-q"){ S.pinUI.q = el.value; pinRedraw(); }
   else if (d === "chat"){ S.chatDraft = el.value; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 160) + "px"; }
   else if (d === "bookq") S.ask.bookDraft = el.value;
   else if (d === "lecq") S.ask.lecDraft = el.value;
@@ -475,6 +488,7 @@ document.addEventListener("change", async e => {
     closeSheet();
     if (!S.sub && !["books", "mybooks"].includes(S.view)) go("books");
   }
+  if (el.dataset && el.dataset.pin){ if (el.checked) S.pinUI.sel.add(el.dataset.pin); else S.pinUI.sel.delete(el.dataset.pin); const c = $("#pin-count"); if (c) c.textContent = "已選 " + S.pinUI.sel.size + " 項"; }
   if (el.id === "note-noindex") act("noidx", async () => {
     await api("/notes/" + S.sub.id, {method: "PATCH", json: {no_index: el.checked}});
     S.note.no_index = el.checked; S.notes = null; render();

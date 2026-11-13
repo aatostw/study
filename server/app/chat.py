@@ -206,7 +206,7 @@ def send(chat_id, text, scope="all", use_kb=True, use_web=False, pins=None, bala
     prev = db.all("SELECT role, content, pool, sources FROM chat_msgs WHERE chat_id = %s ORDER BY id DESC LIMIT 6", (cid,))[::-1]
     last_ai = next((m for m in reversed(prev) if m["role"] == "assistant"), None)
     pins = [{"kind": p["kind"], "id": int(p["id"]), "label": str(p.get("label") or "")[:80]}
-            for p in (pins or []) if p.get("kind") in ("book", "note", "lecture") and str(p.get("id", "")).isdigit()][:10]
+            for p in (pins or []) if p.get("kind") in ("book", "note", "lecture") and str(p.get("id", "")).isdigit()][:30]
     db.run("UPDATE chats SET pins = %s WHERE id = %s", (Jsonb(pins), cid))
     scope = ("pins" if pins else "kb" if use_kb else "") + ("+web" if use_web else "") or "free"
     user = db.one("INSERT INTO chat_msgs (chat_id, role, content, scope) VALUES (%s, 'user', %s, %s) RETURNING *", (cid, text, scope))

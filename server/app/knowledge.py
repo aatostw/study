@@ -154,7 +154,7 @@ def pinned_chunks(pins, k=8):
     """指定的每一項先拿幾段（自己的筆記優先），保證一定在候選裡"""
     col = {"book": "c.book_id = %s", "note": "c.note_id = %s", "lecture": "c.lecture_id = %s"}
     out = []
-    for p in pins[:10]:
+    for p in pins[:30]:
         if p.get("kind") in col:
             out += _chunks_for(col[p["kind"]], int(p["id"]), k)
     return out
