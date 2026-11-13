@@ -90,8 +90,6 @@ function renderBook(){
     '<div class="hero-book"><button class="hero-cover" data-act="cover-sheet" aria-label="換封面">' + coverHTML(b) + '<span class="hc-edit">換封面</span></button>' +
     "<div><h1>" + esc(b.title) + "</h1>" + (b.author ? '<div class="sub">' + esc(b.author) + "</div>" : "") + "</div></div>" +
     '<div class="row wrap"><span class="chip">' + notes.length + " 則筆記</span></div></section>";
-  html += '<div class="row"><button class="btn grow" data-act="note-new">' + ICON.plus + "記一則筆記</button>" +
-    '<button class="btn soft" data-act="analyze" data-id="' + b.id + '">' + ICON.spark + "分析筆記</button></div>";
   html += uploadsHTML("book");
   if (S.busy.ocr) html += '<div class="note"><div class="row"><span class="spinner"></span>正在辨識照片裡的文字…</div></div>';
   if (live && live.status !== "done") html += jobCard(live);
@@ -116,7 +114,7 @@ function notesSection(b, notes){
     tabs.map(t => '<button role="tab" data-act="ntab" data-v="' + esc(t) + '" aria-pressed="' + (S.ntab === t) + '">' + (t === "ai" ? "AI 分析" : esc(t)) + "</button>").join("") + "</div>" +
     '<button class="hbtn" data-act="note-new"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8" stroke-linecap="round"/></svg>新增筆記</button></div>';
   if (S.ntab === "ai"){
-    html += b.analysis ? analysisHTML(b.analysis)
+    html += b.analysis ? analysisHTML(b.analysis) + '<button class="btn soft block" data-act="analyze" data-id="' + b.id + '">' + ICON.spark + "分析筆記（重新整理）</button>"
       : '<div class="empty">' + (notes.length ? "還沒有 AI 分析。按「分析筆記」，AI 會整理這本書筆記的重點、跟其他書的關聯和值得再想的問題。" : "先記幾則筆記，再讓 AI 分析。") + "</div>" +
         (notes.length ? '<button class="btn soft block" data-act="analyze" data-id="' + b.id + '">' + ICON.spark + "分析筆記</button>" : "");
   } else {
