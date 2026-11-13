@@ -83,7 +83,6 @@ function renderBook(){
   const evLive = jobs.find(j => j.ref_id === b.id && j.kind === "evaluate" && j.status !== "done") || (job && job.kind === "evaluate" ? job : null);
   const sh = b.shelf || "reading";
   let html = '<div class="page-top">' + backB + '<span class="grow"></span>' +
-    '<button class="btn soft sm" data-act="ask-pin" data-kind="book" data-id="' + b.id + '" data-label="' + esc(b.title) + '"><span class="chat-ic">' + CHAT_IC + "</span>問助理</button>" +
     '<button class="btn soft sm" data-act="book-edit">' + ICON.edit + "編輯</button></div>" +
     '<section class="card hero"><div class="row between"><div class="seg shelf-seg" role="group" aria-label="狀態">' +
     ["wish", "reading", "done"].map(v => '<button data-act="shelf-set" data-v="' + v + '" aria-pressed="' + (sh === v) + '">' + SHELF[v] + "</button>").join("") + "</div>" +

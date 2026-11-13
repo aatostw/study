@@ -152,8 +152,7 @@ function renderLecture(){
     if (!live || live.status === "done") html += '<div class="note">還沒有逐字稿。</div>';
     return html + lectureMenu(l);
   }
-  html += '<div class="row"><div class="seg grow" role="group">' + [["sum", "摘要"], ["tr", "逐字稿"]].map(o => '<button data-act="lec-tab" data-v="' + o[0] + '" aria-pressed="' + (S.lecTab === o[0]) + '">' + o[1] + "</button>").join("") + "</div>" +
-    '<button class="btn soft" data-act="ask-pin" data-kind="lecture" data-id="' + l.id + '" data-label="' + esc(l.title) + '">💬 問這支影片</button></div>';
+  html += '<div class="seg" role="group">' + [["sum", "摘要"], ["tr", "逐字稿"]].map(o => '<button data-act="lec-tab" data-v="' + o[0] + '" aria-pressed="' + (S.lecTab === o[0]) + '">' + o[1] + "</button>").join("") + "</div>";
   if (S.lecTab === "tr") html += transcriptHTML(segments);
   else html += summaryHTML(l);
   return html + lectureMenu(l);

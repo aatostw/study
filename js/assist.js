@@ -291,3 +291,61 @@ async function pinSheet(){
     pinRedraw();
   }
 }
+
+
+/* =========================================================
+   各頁右上角「問助理」：底部彈窗，只引用這本書／這則筆記／這支影片
+   ========================================================= */
+function popTarget(){
+  const sub = S.sub;
+  if (!sub) return null;
+  if (sub.type === "book" && S.book && S.book.book.id === sub.id) return {kind: "book", id: sub.id, label: S.book.book.title};
+  if (sub.type === "note" && S.note && S.note.id === sub.id) return {kind: "note", id: sub.id, label: S.note.title || "筆記"};
+  if (sub.type === "lecture" && S.lecture && S.lecture.lecture.id === sub.id) return {kind: "lecture", id: sub.id, label: S.lecture.lecture.title};
+  return null;
+}
+function syncAskBtn(){
+  const b = $("#hdr-ask"); if (!b) return;
+  const t = popTarget();
+  b.hidden = !t;
+  if (!t && !$("#askpop").hidden) askPopClose();
+}
+const POP_NAME = {book: "這本書", note: "這則筆記", lecture: "這支影片"};
+function askPopOpen(){
+  const t = popTarget(); if (!t) return;
+  if (!S.pop || S.pop.kind !== t.kind || S.pop.id !== t.id) S.pop = {kind: t.kind, id: t.id, label: t.label, chat: null, pending: null, err: ""};
+  $("#askpop").hidden = false;
+  askPopDraw(true);
+  setTimeout(() => { const q = $("#pop-in"); if (q) q.focus(); }, 250);
+}
+function askPopClose(){ $("#askpop").hidden = true; }
+function askPopDraw(scroll){
+  const P = S.pop, card = $("#askpop-card"); if (!P || !card) return;
+  const keep = $("#pop-in") ? $("#pop-in").value : (P.draft || "");
+  const msgs = (P.chat && P.chat.messages) || [];
+  card.innerHTML = '<div class="grab" aria-hidden="true"></div>' +
+    '<div class="pop-head"><div class="pop-title"><b>問助理</b><span class="part-chip">只看' + POP_NAME[P.kind] + "</span></div>" +
+    (P.chat ? '<button class="btn ghost sm" data-act="askpop-full">到助理繼續</button>' : "") +
+    '<button class="icon-btn" data-act="askpop-close" aria-label="關閉"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
+    '<div class="pop-thread" id="pop-thread">' +
+      (msgs.length ? msgs.map(msgHTML).join("") : '<div class="pop-empty">問問看《' + esc(P.label) + "》裡的內容，回答只會引用" + POP_NAME[P.kind] + "。</div>") +
+      (P.pending ? '<div class="msg user"><div class="bubble">' + esc(P.pending) + '</div></div><div class="msg ai"><div class="bubble"><span class="spinner"></span> 正在找資料、整理回答…</div></div>' : "") +
+      (P.err ? '<div class="note bad">' + esc(P.err) + "</div>" : "") +
+    "</div>" +
+    '<div class="pop-cmp"><textarea id="pop-in" rows="1" placeholder="問' + POP_NAME[P.kind] + '…" enterkeyhint="send">' + esc(keep) + "</textarea>" +
+    '<button class="pop-send" data-act="askpop-send" aria-label="送出"' + (P.pending ? " disabled" : "") + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button></div>';
+  const th = $("#pop-thread"); if (th && scroll) th.scrollTop = th.scrollHeight;
+  const q = $("#pop-in"); if (q){ q.style.height = "auto"; q.style.height = Math.min(q.scrollHeight, 120) + "px"; }
+}
+async function askPopSend(){
+  const P = S.pop, q = $("#pop-in"); if (!P || !q) return;
+  const text = q.value.trim(); if (!text || P.pending) return;
+  q.value = ""; P.pending = text; P.err = ""; askPopDraw(true);
+  try {
+    const r = await api("/chat", {json: {chat_id: P.chat && P.chat.id, message: text, kb: true, web: false, balance: "kb", pins: [{kind: P.kind, id: P.id, label: P.label}]}});
+    if (!P.chat) P.chat = {id: r.chat.id, title: r.chat.title, messages: []};
+    P.chat.messages.push(...r.messages);
+    S.chats = null;
+  } catch (e) { if (!e.relogin){ P.err = errMsg(e); P.draft = text; } }
+  P.pending = null; if (S.pop === P) askPopDraw(true);
+}

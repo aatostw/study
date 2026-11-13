@@ -154,7 +154,10 @@ async function download(path, name, opt){
 const safeName = s => String(s || "export").replace(/[\\/:*?"<>|]+/g, "_").slice(0, 60);
 
 function findSource(ctx, n){
-  if (/^m\d+$/.test(ctx || "")){ const m = S.chat && S.chat.messages.find(x => "m" + x.id === ctx); return ((m && m.sources) || []).find(s => String(s.n) === String(n)); }
+  if (/^m\d+$/.test(ctx || "")){
+    const all = [].concat((S.chat && S.chat.messages) || [], (S.pop && S.pop.chat && S.pop.chat.messages) || []);
+    const m = all.find(x => "m" + x.id === ctx); return ((m && m.sources) || []).find(s => String(s.n) === String(n));
+  }
   const list = ctx === "ask" ? S.ask.cur && S.ask.cur.sources : ctx === "book" ? S.ask.book && S.ask.book.sources
     : ctx === "lec" ? S.ask.lec && S.ask.lec.sources : ctx === "analysis" ? S.book && S.book.book.analysis && S.book.book.analysis.sources : null;
   return (list || []).find(s => String(s.n) === String(n));
@@ -219,6 +222,14 @@ const ACT = {
   "pin-more": el => { S.pinUI.more[el.dataset.k] = !S.pinUI.more[el.dataset.k]; pinRedraw(); },
   "pin-det": el => { S.pinUI.det[el.dataset.k] = !S.pinUI.det[el.dataset.k]; pinRedraw(); },
   "pin-del": el => { S.chatPins.splice(Number(el.dataset.i), 1); render(); },
+  "askpop": () => askPopOpen(),
+  "askpop-close": () => askPopClose(),
+  "askpop-send": () => askPopSend(),
+  "askpop-full": () => {
+    const P = S.pop; if (!P || !P.chat) return;
+    askPopClose(); S.chat = null; go("ask");
+    openChat(P.chat.id).catch(e => toast(errMsg(e)));
+  },
   "ask-pin": el => {
     closeSheet(); S.chat = null; S.err.chat = ""; S.assist = null;
     S.chatPins = [{kind: el.dataset.kind, id: Number(el.dataset.id), label: el.dataset.label}];
@@ -623,10 +634,15 @@ document.addEventListener("change", async e => {
     S.busy.ocr = false; render();
   }
 });
+document.addEventListener("input", e => {
+  if (e.target.id === "pop-in"){ const q = e.target; q.style.height = "auto"; q.style.height = Math.min(q.scrollHeight, 120) + "px"; }
+});
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && $("#cam")){ CAM.close(); return; }
   if (e.key === "Escape" && S.dd){ S.dd = null; render(); return; }
-  if (e.key === "Escape" && S.sheet) closeSheet();
+  if (e.key === "Escape" && S.sheet){ closeSheet(); return; }
+  if (e.key === "Escape" && !$("#askpop").hidden){ askPopClose(); return; }
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing && e.target.id === "pop-in" && matchMedia("(hover: hover)").matches){ e.preventDefault(); askPopSend(); }
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing && (e.target.id === "book-q")){ e.preventDefault(); ACT["ask-book"](); }
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing && e.target.id === "chat-in" && matchMedia("(hover: hover)").matches){ e.preventDefault(); ACT["chat-send"](); }
 });
@@ -634,6 +650,7 @@ const AU = $("#au");
 ["timeupdate", "play", "pause", "loadedmetadata"].forEach(ev => AU.addEventListener(ev, () => playerTick()));
 function afterRender(){
   playerTick();
+  syncAskBtn();
   syncVideo();
   loadThumbs();
   loadCovers();

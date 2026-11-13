@@ -171,7 +171,7 @@ function renderNote(){
   return back + '<section class="card" data-read="' + esc(n.title || "筆記") + '"><div class="row between top"><h2 class="grow" style="margin:0">' + esc(n.title || "（無標題）") + "</h2>" + starBtn("note", n.id, n.starred) + "</div>" +
     '<div class="tiny muted no-read">' + fmtDate(n.updated_at) + (n.no_index ? " · 不放進知識庫" : n.indexed ? "" : " · 建索引中") + "</div>" +
     '<div class="thought">' + esc(n.content) + "</div>" +
-    '<div class="row wrap no-read">' + readBtn() + '<button class="btn soft sm" data-act="ask-pin" data-kind="note" data-id="' + n.id + '" data-label="' + esc(n.title || "筆記") + '">💬 問這則</button><button class="btn soft sm" data-act="free-edit">' + ICON.edit + '編輯</button><button class="btn ghost sm" data-act="free-del" style="color:var(--danger)">' + ICON.trash + "刪除</button></div>" +
+    '<div class="row wrap no-read">' + readBtn() + '<button class="btn soft sm" data-act="free-edit">' + ICON.edit + '編輯</button><button class="btn ghost sm" data-act="free-del" style="color:var(--danger)">' + ICON.trash + "刪除</button></div>" +
     '<label class="check no-read"><input type="checkbox" id="note-noindex"' + (n.no_index ? " checked" : "") + '><span><b>不放進知識庫</b><span class="small muted">助理和知識複習都不會用到這則，例如測驗題、草稿。</span></span></label></section>';
 }
 function freeNoteSheet(n){

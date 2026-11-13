@@ -601,3 +601,21 @@ h1,h2{color:var(--primary-text)}
 .shelf-btns{display:flex;flex:none;margin-top:-2px}
 .shelf-btns .hbtn{padding:6px 2px 6px 10px;font-size:15px}
 .shelf-btns .hbtn svg{width:18px;height:18px}
+
+/* 右上角「問助理」與彈窗 */
+.hdr-ask{display:inline-flex;align-items:center;gap:6px;border:0;background:var(--field);color:var(--ink);font:inherit;font-size:14px;font-weight:700;padding:7px 12px;border-radius:999px;cursor:pointer;flex:none}
+.hdr-ask[hidden]{display:none}
+.hdr-ask svg{width:18px;height:18px}
+.askpop{z-index:35}
+.askpop[hidden]{display:none}
+.askpop-card{height:78%;max-height:78%;gap:10px;padding-bottom:12px;overflow:hidden}
+.pop-head{display:flex;align-items:center;gap:8px;flex:none}
+.pop-title{flex:1;display:flex;align-items:center;gap:8px;min-width:0}
+.pop-title b{font-size:20px;color:var(--primary-text)}
+.pop-thread{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:2px 0 6px}
+.pop-empty{color:var(--muted);font-size:15px;line-height:1.7;padding:24px 6px;text-align:center}
+.pop-cmp{display:flex;align-items:flex-end;gap:8px;flex:none;background:var(--field);border-radius:22px;padding:6px 6px 6px 14px}
+.pop-cmp textarea{flex:1;border:0;background:none;outline:0;font:inherit;font-size:16px;line-height:1.5;resize:none;padding:6px 0;color:var(--ink);max-height:120px}
+.pop-send{width:36px;height:36px;border-radius:50%;border:0;background:var(--ink);color:var(--bg);display:grid;place-items:center;flex:none;cursor:pointer}
+.pop-send svg{width:18px;height:18px}
+.pop-send:disabled{opacity:.4}
