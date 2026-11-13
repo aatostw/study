@@ -619,3 +619,11 @@ h1,h2{color:var(--primary-text)}
 .pop-send{width:36px;height:36px;border-radius:50%;border:0;background:var(--ink);color:var(--bg);display:grid;place-items:center;flex:none;cursor:pointer}
 .pop-send svg{width:18px;height:18px}
 .pop-send:disabled{opacity:.4}
+
+/* 框選 → 討論 */
+.sel-ask{position:fixed;z-index:70;display:inline-flex;align-items:center;justify-content:center;gap:6px;width:92px;height:40px;border:0;border-radius:999px;background:var(--ink);color:var(--bg);font:inherit;font-size:15px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.25);cursor:pointer}
+.sel-ask[hidden]{display:none}
+.sel-ask svg{width:17px;height:17px}
+.pop-quote{display:flex;align-items:flex-start;gap:8px;flex:none;border-left:4px solid var(--yellow,#F3CC58);background:var(--field);border-radius:10px;padding:8px 6px 8px 12px}
+.pop-quote .pq-t{flex:1;font-size:14px;line-height:1.6;color:var(--ink);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.pop-quote .icon-btn{width:28px;height:28px;flex:none}

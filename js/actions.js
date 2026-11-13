@@ -225,6 +225,7 @@ const ACT = {
   "askpop": () => askPopOpen(),
   "askpop-close": () => askPopClose(),
   "askpop-send": () => askPopSend(),
+  "askpop-unquote": () => { if (S.pop){ S.pop.quote = ""; askPopDraw(); } },
   "askpop-full": () => {
     const P = S.pop; if (!P || !P.chat) return;
     askPopClose(); S.chat = null; go("ask");

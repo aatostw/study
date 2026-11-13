@@ -311,9 +311,10 @@ function syncAskBtn(){
   if (!t && !$("#askpop").hidden) askPopClose();
 }
 const POP_NAME = {book: "這本書", note: "這則筆記", lecture: "這支影片"};
-function askPopOpen(){
+function askPopOpen(quote){
   const t = popTarget(); if (!t) return;
   if (!S.pop || S.pop.kind !== t.kind || S.pop.id !== t.id) S.pop = {kind: t.kind, id: t.id, label: t.label, chat: null, pending: null, err: ""};
+  S.pop.quote = quote ? quote.slice(0, 600) : (S.pop.quote || "");
   $("#askpop").hidden = false;
   askPopDraw(true);
   setTimeout(() => { const q = $("#pop-in"); if (q) q.focus(); }, 250);
@@ -332,15 +333,17 @@ function askPopDraw(scroll){
       (P.pending ? '<div class="msg user"><div class="bubble">' + esc(P.pending) + '</div></div><div class="msg ai"><div class="bubble"><span class="spinner"></span> 正在找資料、整理回答…</div></div>' : "") +
       (P.err ? '<div class="note bad">' + esc(P.err) + "</div>" : "") +
     "</div>" +
-    '<div class="pop-cmp"><textarea id="pop-in" rows="1" placeholder="問' + POP_NAME[P.kind] + '…" enterkeyhint="send">' + esc(keep) + "</textarea>" +
+    (P.quote ? '<div class="pop-quote"><span class="pq-t">' + esc(P.quote) + '</span><button class="icon-btn" data-act="askpop-unquote" aria-label="取消引用"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' : "") +
+    '<div class="pop-cmp"><textarea id="pop-in" rows="1" placeholder="' + (P.quote ? "想討論什麼？直接送出＝解釋這段" : "問" + POP_NAME[P.kind] + "…") + '" enterkeyhint="send">' + esc(keep) + "</textarea>" +
     '<button class="pop-send" data-act="askpop-send" aria-label="送出"' + (P.pending ? " disabled" : "") + '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button></div>';
   const th = $("#pop-thread"); if (th && scroll) th.scrollTop = th.scrollHeight;
   const q = $("#pop-in"); if (q){ q.style.height = "auto"; q.style.height = Math.min(q.scrollHeight, 120) + "px"; }
 }
 async function askPopSend(){
   const P = S.pop, q = $("#pop-in"); if (!P || !q) return;
-  const text = q.value.trim(); if (!text || P.pending) return;
-  q.value = ""; P.pending = text; P.err = ""; askPopDraw(true);
+  const typed = q.value.trim(); if ((!typed && !P.quote) || P.pending) return;
+  const text = P.quote ? "關於這段：「" + P.quote + "」\n" + (typed || "幫我解釋這段在說什麼，並連結我的筆記。") : typed;
+  q.value = ""; P.quote = ""; P.pending = text; P.err = ""; askPopDraw(true);
   try {
     const r = await api("/chat", {json: {chat_id: P.chat && P.chat.id, message: text, kb: true, web: false, balance: "kb", pins: [{kind: P.kind, id: P.id, label: P.label}]}});
     if (!P.chat) P.chat = {id: r.chat.id, title: r.chat.title, messages: []};
@@ -349,3 +352,25 @@ async function askPopSend(){
   } catch (e) { if (!e.relogin){ P.err = errMsg(e); P.draft = text; } }
   P.pending = null; if (S.pop === P) askPopDraw(true);
 }
+
+/* 框選文字 → 浮出「討論」→ 帶著那段話開「問助理」 */
+const SELB = {text: "", t: 0};
+function selBtn(){ let b = $("#sel-ask"); if (!b){ b = document.createElement("button"); b.id = "sel-ask"; b.className = "sel-ask"; b.type = "button";
+  b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-9l-5 4v-4H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" fill="currentColor"/></svg>討論';
+  b.addEventListener("pointerdown", e => e.preventDefault());
+  b.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); const t = SELB.text; b.hidden = true; const sel = getSelection(); if (sel) sel.removeAllRanges(); askPopOpen(t); });
+  document.body.appendChild(b); } return b; }
+function selCheck(){
+  const sel = getSelection(), b = selBtn();
+  const txt = sel && !sel.isCollapsed ? sel.toString().replace(/\s+/g, " ").trim() : "";
+  const main = $("#main");
+  if (txt.length < 2 || !popTarget() || !$("#askpop").hidden || !main || !main.contains(sel.anchorNode) || (sel.anchorNode.parentElement && sel.anchorNode.parentElement.closest("input,textarea"))){ b.hidden = true; return; }
+  SELB.text = txt;
+  const r = sel.getRangeAt(sel.rangeCount - 1).getBoundingClientRect();
+  const w = 92, x = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), innerWidth - w - 8);
+  let y = r.bottom + 34;                       // 手機的選取把手在下面，往下讓開
+  if (y > innerHeight - 140) y = Math.max(70, r.top - 96);
+  b.style.left = x + "px"; b.style.top = y + "px"; b.hidden = false;
+}
+document.addEventListener("selectionchange", () => { clearTimeout(SELB.t); SELB.t = setTimeout(selCheck, 250); });
+document.addEventListener("scroll", () => { const b = $("#sel-ask"); if (b && !b.hidden) selCheck(); }, true);
