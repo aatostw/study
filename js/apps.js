@@ -14,7 +14,7 @@ const APP_ID = /english/.test(location.hostname) || /英文/.test(document.title
 
 function appSwitchOpen(){
   appSwitchClose();
-  const brand = document.getElementById("brand");
+  const brand = [document.getElementById("brand"), document.getElementById("appsw-btn")].find(x => x && !x.hidden && x.offsetParent);
   const r = brand ? brand.getBoundingClientRect() : {left: 12, bottom: 56};
   const wrap = document.createElement("div");
   wrap.id = "appsw";
@@ -39,6 +39,6 @@ document.addEventListener("click", e => {
     return;
   }
   if (e.target.closest && e.target.closest("#appsw")){ appSwitchClose(); return; }
-  if (e.target.closest && e.target.closest("#brand, [data-act=app-switch]")){ e.preventDefault(); e.stopPropagation(); appSwitchOpen(); }
+  if (e.target.closest && e.target.closest("#brand, #appsw-btn, [data-act=app-switch]")){ e.preventDefault(); e.stopPropagation(); appSwitchOpen(); }
 }, true);
 document.addEventListener("keydown", e => { if (e.key === "Escape") appSwitchClose(); });
