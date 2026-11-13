@@ -8,6 +8,7 @@
 """
 import json
 import os
+import re
 import time
 import traceback
 
@@ -33,12 +34,16 @@ class Progress:
                    (step, round(max(0.0, min(1.0, frac)), 3), self.id))
 
 
+BUSY_RE = re.compile(r"(?i)\b(503|529|429)\b|high demand|overloaded|UNAVAILABLE|RESOURCE_EXHAUSTED|忙碌|很忙")
+RETRY_MIN = [5, 15, 30, 60]          # 忙碌時：5、15、30、60 分鐘後自動再試
+
+
 def worker():
     db.run("UPDATE jobs SET status = 'queued', step = '電腦重開後重新排隊' WHERE status = 'running'")
     while True:
         try:
             job = db.one("UPDATE jobs SET status = 'running', updated_at = now() WHERE id = ("
-                         "SELECT id FROM jobs WHERE status = 'queued' ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED) RETURNING *")
+                         "SELECT id FROM jobs WHERE status = 'queued' AND (run_after IS NULL OR run_after <= now()) ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED) RETURNING *")
         except Exception as e:
             print("  [工作佇列] 資料庫錯誤：%s" % e, flush=True)
             time.sleep(10)
@@ -55,6 +60,14 @@ def worker():
             print("  完成：%s %s" % (job["kind"], job["title"]), flush=True)
         except Exception as e:
             msg = str(e) if isinstance(e, (ai.AIError, RuntimeError, ValueError)) else "%s: %s" % (type(e).__name__, e)
+            n = job.get("attempts") or 0
+            if BUSY_RE.search(msg) and n < len(RETRY_MIN):
+                wait = RETRY_MIN[n]
+                print("  AI 很忙：%s，%d 分鐘後自動重試（第 %d 次）" % (job["title"], wait, n + 1), flush=True)
+                db.run("UPDATE jobs SET status = 'queued', attempts = attempts + 1, run_after = now() + %s * interval '1 minute', "
+                       "step = %s, error = '', updated_at = now() WHERE id = %s",
+                       (wait, "AI 現在很忙，%d 分鐘後自動重試（第 %d 次）" % (wait, n + 1), job["id"]))
+                continue
             traceback.print_exc()
             db.run("UPDATE jobs SET status = 'error', error = %s, updated_at = now() WHERE id = %s", (msg[:800], job["id"]))
             _mark_ref_error(job)

@@ -58,12 +58,12 @@ def _parse(text):
     return out
 
 
-def _gemini_model():
+def _gemini_models():
+    """先用你選的 Gemini 模型，忙的話換其他 Gemini 模型"""
     s = ai.settings()
     m = s["models"].get("summary") or {}
-    if m.get("provider") == "gemini" and m.get("model"):
-        return s, m["model"]
-    return s, ai.FALLBACK["gemini"][0]
+    first = [m["model"]] if m.get("provider") == "gemini" and m.get("model") else []
+    return s, list(dict.fromkeys(first + ai.FALLBACK["gemini"]))
 
 
 def youtube_segments(lec, prog):
@@ -71,7 +71,7 @@ def youtube_segments(lec, prog):
     if config.FAKE:
         from . import fake
         return fake.transcribe(600)
-    s, model = _gemini_model()
+    s, models = _gemini_models()
     key = ai._key(s, "gemini")
     base = ai._base(s, "gemini")
     lang = {"zh": "影片是中文的話用台灣繁體中文；夾雜的英文保留原文。", "en": "照影片原本的語言（英文）寫，不要翻譯。"}.get(lec["lang"], "照影片原本的語言寫；中文用台灣繁體。")
@@ -90,13 +90,17 @@ def youtube_segments(lec, prog):
                 "generationConfig": {"maxOutputTokens": 60000, "mediaResolution": "MEDIA_RESOLUTION_LOW"}}
         prog("Gemini 看影片、寫逐字稿%s" % ("（從 %s 接著寫）" % engines_fmt(offset) if offset else ""), 0.05 + 0.5 * min(part, 5) / 6, True)
         r = None
-        for attempt, wait in enumerate([0, 10, 30]):
-            time.sleep(wait)
-            try:
-                r = httpx.post("%s/models/%s:generateContent" % (base, model), params={"key": key}, json=body,
-                               timeout=httpx.Timeout(900, connect=20))
-            except httpx.HTTPError as e:
-                raise RuntimeError("連不到 Gemini：%s" % e)
+        for model in models:
+            for wait in (0, 15):
+                time.sleep(wait)
+                try:
+                    r = httpx.post("%s/models/%s:generateContent" % (base, model), params={"key": key}, json=body,
+                                   timeout=httpx.Timeout(900, connect=20))
+                except httpx.HTTPError as e:
+                    raise RuntimeError("連不到 Gemini：%s" % e)
+                if r.status_code not in ai.BUSY:
+                    break
+                print("  [影片] %s 忙碌（%d），%s" % (model, r.status_code, "稍後重試" if not wait else "換下一個模型"), flush=True)
             if r.status_code not in ai.BUSY:
                 break
         if r.status_code != 200:

@@ -770,7 +770,7 @@ def job_list(active: int = 0, limit: int = 20):
 
 @app.post("/jobs/{jid}/retry")
 def job_retry(jid: int):
-    j = db.one("UPDATE jobs SET status = 'queued', error = '', step = '重新排隊', progress = 0, updated_at = now() "
+    j = db.one("UPDATE jobs SET status = 'queued', error = '', step = '重新排隊', progress = 0, run_after = NULL, attempts = 0, updated_at = now() "
                "WHERE id = %s AND status = 'error' RETURNING *", (jid,))
     if not j:
         raise Bad("這個工作不能重試")
