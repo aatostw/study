@@ -199,7 +199,7 @@ function lectureAskHTML(l){
   const r = S.ask.lec && S.ask.lec.lid === l.id ? S.ask.lec : null;
   return '<section class="card"><div class="label">只問這支影片</div><textarea class="input" id="lec-q" rows="2" placeholder="影片裡怎麼解釋…？舉了什麼例子？" data-draft="lecq">' + esc(S.ask.lecDraft || "") + "</textarea>" +
     '<button class="btn block green" data-act="ask-lec"' + (S.busy.askLec ? " disabled" : "") + ">" + (S.busy.askLec ? '<span class="spinner"></span>找答案中…' : "問") + "</button>" +
-    (S.err.askLec ? '<div class="err">' + esc(S.err.askLec) + "</div>" : "") + "</section>" + (r ? answerHTML(r, "lec") : "");
+    (S.err.askLec ? errBox(esc(S.err.askLec), "err:askLec") : "") + "</section>" + (r ? answerHTML(r, "lec") : "");
 }
 function lectureMenu(l){
   return '<section class="card flat"><div class="label">標題</div><div class="row wrap">' +

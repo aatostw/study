@@ -117,7 +117,8 @@ def parse_json(text):
                 return json.loads(t[a:b + 1])
             except ValueError:
                 continue
-    raise ValueError("AI 回傳的不是 JSON：" + t[:200])
+    print("  [AI] 回傳的不是完整 JSON（前 300 字）：%s" % t[:300].replace("\n", " "), flush=True)
+    raise ValueError("AI 的回答不完整（可能太長被切斷或格式錯誤），請再試一次；常發生的話換一個模型。")
 
 
 # ---------- 讀書檔 ----------

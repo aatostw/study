@@ -46,7 +46,7 @@ function renderAssist(){
       '<div class="msg ai"><div class="bubble typing"><span></span><span></span><span></span></div><div class="tiny muted">' + (S.chatPins.length ? "正在翻你指定的資料…" : S.chatOpts.kb && S.chatOpts.web ? "正在翻你的書櫃、上網找資料…" : S.chatOpts.kb ? "正在翻你的書櫃…" : S.chatOpts.web ? "正在上網找資料…" : "思考中…") + "</div></div>";
     html += "</div>";
   }
-  if (S.err.chat) html += '<div class="err">' + esc(S.err.chat) + "</div>";
+  if (S.err.chat) html += errBox(esc(S.err.chat), "err:chat");
   const pins = S.chatPins;
   const citeTog = '<div class="cmp-top"><button class="tog cite-tog" data-act="cite-toggle" aria-pressed="' + S.showCite + '"><span class="box">' + (S.showCite ? "✓" : "") + "</span>顯示引用</button></div>";
   const pinRow0 = pins.length ? '<div class="pins">' + pins.map((p, i) => '<span class="pin-chip">' + ({book: "📘", note: "📝", lecture: "🎓"}[p.kind] || "📌") + " " + esc(p.label) +
@@ -331,7 +331,7 @@ function askPopDraw(scroll){
     '<div class="pop-thread" id="pop-thread">' +
       (msgs.length ? msgs.map(msgHTML).join("") : '<div class="pop-empty">問問看《' + esc(P.label) + "》裡的內容，回答只會引用" + POP_NAME[P.kind] + "。</div>") +
       (P.pending ? '<div class="msg user"><div class="bubble">' + esc(P.pending) + '</div></div><div class="msg ai"><div class="bubble"><span class="spinner"></span> 正在找資料、整理回答…</div></div>' : "") +
-      (P.err ? '<div class="note bad">' + esc(P.err) + "</div>" : "") +
+      (P.err ? errBox(esc(P.err), "pop:err") : "") +
     "</div>" +
     (P.quote ? '<div class="pop-quote"><span class="pq-t">' + esc(P.quote) + '</span><button class="icon-btn" data-act="askpop-unquote" aria-label="取消引用"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' : "") +
     '<div class="pop-cmp"><textarea id="pop-in" rows="1" placeholder="' + (P.quote ? "想討論什麼？直接送出＝解釋這段" : "問" + POP_NAME[P.kind] + "…") + '" enterkeyhint="send">' + esc(keep) + "</textarea>" +

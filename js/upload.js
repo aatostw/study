@@ -83,10 +83,11 @@ function uploadsHTML(kind){
   return '<div class="stack">' + list.map(u => {
     const frac = (u.cur || u.sent || 0) / (u.size || 1);
     const label = {start: "準備上傳", sending: "上傳中 " + Math.floor(frac * 100) + "%", finishing: "電腦正在組合檔案…", done: "上傳完成", error: "上傳失敗"}[u.state];
-    return '<div class="up"><div class="row between"><b class="grow clamp2 small">' + esc(u.name) + '</b><span class="tiny muted">' + fmtSize(u.size) + "</span></div>" +
+    return '<div class="up' + (u.state === "error" ? " up-err" : "") + '"><div class="row between"><b class="grow clamp2 small">' + esc(u.name) + '</b><span class="tiny muted">' + fmtSize(u.size) + "</span></div>" +
       progressBar(u.state === "done" ? 1 : frac, true) +
       '<div class="row between"><span class="small ' + (u.state === "error" ? "" : "muted") + '">' + label + (u.err ? "：" + esc(u.err) : "") + "</span>" +
-      (u.state === "error" && u.file ? '<button class="btn sm" data-act="up-retry" data-key="' + u.key + '">重試</button>' : "") + "</div></div>";
+      (u.state === "error" && u.file ? '<button class="btn sm" data-act="up-retry" data-key="' + u.key + '">重試</button>' : "") + "</div>" +
+      (u.state === "error" ? '<button class="err-x" data-act="up-x" data-key="' + u.key + '" aria-label="關閉"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg></button>' : "") + "</div>";
   }).join("") + "</div>";
 }
 

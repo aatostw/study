@@ -30,7 +30,7 @@ async function loadBook(){
 async function loadSettings(){ const j = await api("/settings"); S.settings = j; S.err.load = ""; render(); }
 async function loadStatus(){ S.status = await api("/status"); render(); }
 
-function loadErr(){ return S.err.load ? '<div class="err">' + esc(S.err.load) + '</div><button class="btn soft" data-act="reload">再試一次</button>' : ""; }
+function loadErr(){ return S.err.load ? errBox(esc(S.err.load), "err:load", '<button class="btn soft" data-act="reload">再試一次</button>') : ""; }
 function loading(){ return loadErr() || '<div class="card flat"><div class="row"><span class="spinner"></span><span>載入中…</span></div></div>'; }
 
 /* ---------- 問答 ---------- */
@@ -68,7 +68,7 @@ function sourceSheet(s){
 function jobCard(job){
   if (!job || job.status === "done" || job.status === "cancelled") return "";
   const name = {bookfile: "讀取原文", analyze: "AI 分析", lecture: "處理影片", resummarize: "重新摘要", evaluate: "選書評估", review: "知識複習"}[job.kind] || "處理中";
-  if (job.status === "error") return '<div class="err">' + name + "失敗：" + esc(job.error) + '</div><button class="btn soft sm" data-act="job-retry" data-id="' + job.id + '">再試一次</button>';
+  if (job.status === "error") return errBox(name + "失敗：" + esc(job.error), "job:" + job.id, '<button class="btn soft sm" data-act="job-retry" data-id="' + job.id + '">再試一次</button>');
   const x = job.kind === "evaluate" ? '<button class="job-x" data-act="job-cancel" data-id="' + job.id + '" aria-label="取消' + name + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg></button>' : "";
   return '<div class="up"><div class="row between"><b class="small">' + name + '</b><span class="tiny muted">' + (job.status === "queued" ? "排隊中" : Math.round(job.progress * 100) + "%") + "</span></div>" +
     (x ? '<div class="job-bar">' + progressBar(job.progress) + x + "</div>" : progressBar(job.progress)) + '<div class="small muted">' + esc(job.step || "等前面的工作做完") + "</div></div>";

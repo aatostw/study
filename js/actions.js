@@ -341,6 +341,15 @@ const ACT = {
   },
 
   /* 朗讀 */
+  "up-x": el => { S.uploads = S.uploads.filter(u => String(u.key) !== el.dataset.key); render(); },
+  "err-x": el => {
+    const k = el.dataset.k || "";
+    if (k.startsWith("err:")) S.err[k.slice(4)] = "";
+    else if (k.startsWith("job:") || k.startsWith("rv:")){ S.dismissed.add(k); lsSet("dismissed", [...S.dismissed].slice(-100).join(",")); }
+    if (k.startsWith("tmp:")) S.dismissed.add(k);
+    if (k === "pop:err" && S.pop) S.pop.err = "";
+    const w = el.closest(".err-wrap"); if (w) w.remove();
+  },
   "read-eval": () => { const box = $("#eval-body"); if (box) readAloud(readableText(box), box.dataset.read); },
   "read-note": () => { const box = $("#note-card"); if (box) readAloud(readableText(box), box.dataset.read); },
   "read": el => { const box = el.closest("[data-read]"); if (box) readAloud(readableText(box), box.dataset.read); },

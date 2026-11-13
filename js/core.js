@@ -188,4 +188,11 @@ function richHTML(text, ctx){
   return out;
 }
 function timeBtn(t){ return t == null ? "" : '<button class="time" data-act="seek" data-t="' + t + '">' + fmtT(t) + "</button>"; }
+/* 錯誤框：右上角都有 ✕ 可以關掉 */
+S.dismissed = new Set((lsGet("dismissed") || "").split(",").filter(Boolean));
+function errBox(msg, key, extra){
+  if (key && S.dismissed.has(key)) return "";
+  return '<div class="err-wrap"><div class="err">' + msg + '</div><button class="err-x" data-act="err-x" data-k="' + esc(key || "") + '" aria-label="關閉">' +
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg></button>' + (extra || "") + "</div>";
+}
 function progressBar(frac, blue){ return '<div class="progress' + (blue ? " blue" : "") + '"><span style="width:' + Math.round(Math.max(0.02, Math.min(1, frac || 0)) * 100) + '%"></span></div>'; }

@@ -250,7 +250,7 @@ function renderReview(){
   if (!r) return html + (live ? "" : '<section class="card"><div class="empty">還沒有複習。按「產生本週至今」先看看這週的整理。</div></section>');
   const c = r.content || {};
   if (r.status === "empty") return html + '<section class="card"><div class="empty">這一週（' + esc(c.label || "") + "）還沒有新的筆記、書或影片，沒有東西可以複習。</div></section>";
-  if (r.status === "error" && !c.headline) return html + '<div class="err">這篇複習沒有做好，再按一次「產生本週至今」。</div>';
+  if (r.status === "error" && !c.headline) return html + errBox("這篇複習沒有做好，再按一次「產生本週至今」。", "rv:" + r.id);
   if (!c.headline) return html;
   const cnt = c.counts || {};
   html += '<section class="card" data-read="知識複習"><div class="row between no-read"><div class="label">本週主軸</div>' +

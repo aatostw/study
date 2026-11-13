@@ -696,3 +696,11 @@ h1,h2{color:var(--primary-text)}
 .lic-inline .lic{width:15px;height:15px}
 .list-row .ic.lic-box,.list-row .ic.lic-box.lt-green,.list-row .ic.lic-box.lt-yellow,.list-row .ic.lic-box.lt-red,.list-row .ic.lic-box.lt-unknown{background:none;width:30px;margin-right:-2px}
 .list-row .ic.lic-box .lic{width:30px;height:30px}
+
+/* 錯誤框右上角的 ✕ */
+.err-wrap{position:relative;display:flex;flex-direction:column;gap:8px}
+.err-wrap .err{padding-right:40px}
+.err-x{position:absolute;top:6px;right:6px;width:30px;height:30px;border:0;border-radius:50%;background:rgba(255,255,255,.7);color:var(--danger,#c0392b);display:grid;place-items:center;cursor:pointer;padding:0}
+.err-x svg{width:16px;height:16px}
+.err-wrap > .btn{align-self:flex-start}
+.up.up-err{position:relative;padding-right:44px}

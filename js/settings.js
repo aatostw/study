@@ -65,7 +65,7 @@ function dd(id, label, options, cur, extraCls){
 function statusPage(){
   const s = S.status;
   let html = '<section class="card pref-card"><div class="row between"><h2 style="font-size:20px">電腦狀態</h2><button class="btn ghost sm" data-act="status-refresh">重新整理</button></div>';
-  if (S.online === false) return html + '<div class="err">連不到電腦。確認電腦開著、「啟動學習伺服器」視窗也開著。</div></section>';
+  if (S.online === false) return html + errBox("連不到電腦。確認電腦開著、「啟動學習伺服器」視窗也開著。", "tmp:offline") + "</section>";
   if (!s) return html + '<div class="row muted"><span class="spinner"></span>讀取中…</div></section>';
   const row = (k, v) => '<div class="pref-row"><span class="small"><b>' + k + "</b></span><span class=\"small\">" + v + "</span></div>";
   html += '<div class="pref-group"><div class="pref-h">運算</div>' +
@@ -78,8 +78,8 @@ function statusPage(){
     row("工作佇列", (s.queue.running ? "處理中 " + s.queue.running : "閒置") + (s.queue.queued ? "，排隊 " + s.queue.queued : "")) +
     row("內容", s.counts.books + " 本書・" + s.counts.notes + " 則筆記・" + s.counts.lectures + " 支影片") +
     row("硬碟剩餘", s.disk_free_gb + " GB") + "</div>" +
-    (s.asr_error ? '<div class="err">Whisper：' + esc(s.asr_error) + "</div>" : "") +
-    (s.embed_error ? '<div class="err">向量模型：' + esc(s.embed_error) + "</div>" : "") +
+    (s.asr_error ? errBox("Whisper：" + esc(s.asr_error), "tmp:asr") : "") +
+    (s.embed_error ? errBox("向量模型：" + esc(s.embed_error), "tmp:embed") : "") +
     (s.fake ? '<div class="note warn">電腦端在測試模式（STUDY_FAKE），結果都是假的。</div>' : "");
   return html + "</section>";
 }
@@ -141,7 +141,7 @@ function voicePage(){
     '<div class="pref-group"><div class="row between"><label class="pref-h" for="pref-speed">預設速度</label><span class="val-pill" id="pref-speed-v">' + sp.toFixed(1) + '×</span></div>' +
     '<input type="range" id="pref-speed" min="0.6" max="1.6" step="0.1" value="' + sp + '" data-act-change="pref-speed" style="accent-color:var(--primary)"></div>' +
     '<div class="pref-group"><div class="pref-h">試聽</div><button class="btn soft" data-act="voice-test"' + (S.busy.voiceTest ? " disabled" : "") + ">" + (S.busy.voiceTest ? '<span class="spinner"></span>' : ICON.speaker) + "唸一句聽聽看</button></div>" +
-    (S.err.voiceTest ? '<div class="err">' + esc(S.err.voiceTest) + "</div>" : "") + "</section>";
+    (S.err.voiceTest ? errBox(esc(S.err.voiceTest), "err:voiceTest") : "") + "</section>";
 }
 
 function refHTML(){
