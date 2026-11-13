@@ -20,16 +20,26 @@ async function openChat(id){
   S.chatScroll = true; render();
 }
 
+const WAVE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 10.5v3"/></svg>';
+const SEND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5.5 11.5L12 5l6.5 6.5"/></svg>';
+const MIC2 = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="9" y="3" width="6" height="11.5" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>';
+
+/* 目前的回答方式，一行字 */
+function chatModeLabel(){
+  const o = S.chatOpts, n = S.chatPins.length;
+  let s = n ? "指定 " + n + " 項" : o.kb && o.web ? "書櫃＋網路" : o.kb ? "書櫃" : o.web ? "網路" : "直接聊";
+  if (o.web && (o.kb || n) && o.balance !== "kb") s += "・" + {even: "平衡", web: "網路為主"}[o.balance];
+  return s;
+}
+
 function renderAssist(){
-  let html = "" +
-    '<div class="row between assist-bar"><div class="mode-seg" role="group" aria-label="模式">' +
-      '<button data-act="voice-mode" data-v="0" aria-pressed="' + !S.voice + '">⌨️ 文字</button><button data-act="voice-mode" data-v="1" aria-pressed="' + S.voice + '">🎙️ 語音</button></div>' +
+  let html = '<div class="row between assist-bar"><span class="small muted ellip">' + esc(S.chat ? S.chat.title : "新對話") + "</span>" +
     '<span class="row"><button class="btn ghost sm" data-act="chat-history">🕘 紀錄</button>' +
     (S.chat ? '<button class="btn ghost sm" data-act="chat-new">' + ICON.plus + "新對話</button>" : "") + "</span></div>";
 
   const msgs = (S.chat && S.chat.messages) || [];
   if (!msgs.length && !S.chatPending){
-    html += '<section class="card hero"><div class="label">助理</div><h1>想聊什麼？</h1><div class="sub">勾「引用書櫃」會翻你的書、筆記、課程回答並標出處；勾「網路搜尋」會上網找資料；兩個都不勾就直接聊。</div></section>';
+    html += '<section class="card hero"><div class="label">助理</div><h1>想聊什麼？</h1><div class="sub">按左下角「＋」可以選要不要引用書櫃、上網搜尋，或指定只看某幾本書。</div></section>';
   } else {
     html += '<div class="thread">' + msgs.map(msgHTML).join("");
     if (S.chatPending) html += '<div class="msg user"><div class="bubble">' + esc(S.chatPending) + "</div></div>" +
@@ -37,25 +47,39 @@ function renderAssist(){
     html += "</div>";
   }
   if (S.err.chat) html += '<div class="err">' + esc(S.err.chat) + "</div>";
-  const o = S.chatOpts, pins = S.chatPins;
-  const scope = '<div class="scope-mini">' +
-    '<button class="tog" data-act="chat-opt" data-k="kb" aria-pressed="' + (o.kb || !!pins.length) + '"' + (pins.length ? " disabled" : "") + '><span class="box">' + (o.kb || pins.length ? "✓" : "") + "</span>" + (pins.length ? "只看指定" : "引用書櫃") + "</button>" +
-    '<button class="tog" data-act="chat-opt" data-k="web" aria-pressed="' + o.web + '"><span class="box">' + (o.web ? "✓" : "") + "</span>網路搜尋</button>" +
-    '<button class="tog pin" data-act="pin-sheet" aria-pressed="' + (!!pins.length || o.balance !== "kb") + '">⚙️ 進階' +
-      ([pins.length ? "指定 " + pins.length : "", o.web && o.balance !== "kb" ? {even: "平衡", web: "網路為主"}[o.balance] : ""].filter(Boolean).map(x => "・" + x).join("")) + "</button>" +
-    '<button class="tog" data-act="cite-toggle" aria-pressed="' + S.showCite + '"><span class="box">' + (S.showCite ? "✓" : "") + "</span>顯示引用</button>" +
-    (!o.kb && !o.web && !pins.length ? '<span class="tiny muted">直接聊</span>' : "") + "</div>" +
-    (pins.length ? '<div class="pins">' + pins.map((p, i) => '<span class="pin-chip">' + ({book: "📘", note: "📝", lecture: "🎓"}[p.kind] || "📌") + " " + esc(p.label) +
-      '<button data-act="pin-del" data-i="' + i + '" aria-label="取消指定">✕</button></span>').join("") + "</div>" : "");
+  const pins = S.chatPins;
+  const pinRow = pins.length ? '<div class="pins">' + pins.map((p, i) => '<span class="pin-chip">' + ({book: "📘", note: "📝", lecture: "🎓"}[p.kind] || "📌") + " " + esc(p.label) +
+      '<button data-act="pin-del" data-i="' + i + '" aria-label="取消指定">✕</button></span>').join("") + "</div>" : "";
   if (S.voice){
-    html += '<div class="composer voice">' + scope + voiceHTML() + "</div>";
+    html += '<div class="composer voice">' + pinRow + voiceHTML() + '<button class="btn ghost sm" data-act="voice-mode" data-v="0">⌨️ 改用文字</button></div>';
     return html;
   }
-  html += '<div class="composer">' + scope +
-    '<div class="row"><textarea class="input" id="chat-in" rows="1" placeholder="' + (msgs.length ? "接著問…" : "問你讀過的書、上過的課…") + '" data-draft="chat">' + esc(S.chatDraft || "") + "</textarea>" +
-    '<button class="send" data-act="chat-send" aria-label="送出"' + (S.chatPending ? " disabled" : "") + ">" +
-    (S.chatPending ? '<span class="spinner" style="width:18px;height:18px;border-color:#fff4;border-top-color:#fff"></span>' : '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 20.4l17.5-7.5c.8-.4.8-1.5 0-1.8L3.4 3.6c-.7-.3-1.4.3-1.3 1l1.4 6.3 9 1.1-9 1.1-1.4 6.3c-.1.7.6 1.3 1.3 1z"/></svg>') + "</button></div></div>";
+  const draft = S.chatDraft || "", rec = S.rec.state;
+  const open = !!draft || S.cmpOpen;
+  let act;
+  if (S.chatPending) act = '<button class="cmp-act" disabled aria-label="回答中"><span class="spinner" style="width:18px;height:18px;border-color:#fff4;border-top-color:#fff"></span></button>';
+  else act = '<button class="cmp-act" data-act="cmp-act" aria-label="' + (draft.trim() ? "送出" : "語音對話") + '">' + (draft.trim() ? SEND : WAVE) + "</button>";
+  html += '<div class="composer">' + pinRow +
+    '<div class="cmp' + (open ? " open" : "") + (draft.trim() ? " has-text" : "") + (rec === "rec" && S.recMode !== "voice" ? " recording" : "") + '" id="cmp">' +
+      '<textarea id="chat-in" rows="1" data-draft="chat" placeholder="' + (rec === "rec" ? (S.recMode === "ptt" ? "正在聽…放開就送出" : "正在聽…再按麥克風結束") : rec === "stt" ? "聽寫中…" : open ? "回覆助理…" : "回覆或長按說話") + '">' + esc(draft) + "</textarea>" +
+      '<button class="cmp-btn plus" data-act="cmp-menu" aria-label="選項">' + ICON.plus + "</button>" +
+      '<button class="cmp-chip" data-act="cmp-menu">' + esc(chatModeLabel()) + "</button>" +
+      '<button class="cmp-btn mic' + (rec === "rec" && S.recMode === "dictate" ? " on" : "") + '" data-act="cmp-mic" aria-label="聽寫"' + (rec === "stt" ? " disabled" : "") + ">" +
+        (rec === "stt" && S.recMode !== "voice" ? '<span class="spinner" style="width:16px;height:16px"></span>' : MIC2) + "</button>" +
+      act + "</div></div>";
   return html;
+}
+
+/* 「＋」選單：引用書櫃、網路搜尋、顯示引用、進階 */
+function cmpMenu(){
+  const o = S.chatOpts, n = S.chatPins.length;
+  const sw = (k, on, title, sub, dis) => '<button class="menu-sw" data-act="' + k + '"' + (dis ? " disabled" : "") + '><span><b>' + title + '</b><span class="small muted">' + sub + '</span></span><span class="sw' + (on ? " on" : "") + '"></span></button>';
+  openSheet('<h2 style="margin:0">回答方式</h2><div class="stack">' +
+    sw("menu-kb", o.kb || n, n ? "只看指定的資料" : "引用書櫃", n ? "已指定 " + n + " 項，取消指定才會搜整個書櫃" : "翻你的書、筆記、課程，回答會標出處", n) +
+    sw("menu-web", o.web, "網路搜尋", "用電腦上的搜尋引擎找網路資料") +
+    sw("menu-cite", S.showCite, "顯示引用", "回答裡的 [1] [2] 編號") +
+    '<button class="menu-sw" data-act="pin-sheet"><span><b>⚙️ 進階</b><span class="small muted">比重（' + {kb: "書櫃為主", even: "平衡", web: "網路為主"}[o.balance] + "）・指定資料" + (n ? "（" + n + " 項）" : "") + '</span></span><span class="chev">›</span></button>' +
+    "</div>" + (!o.kb && !o.web && !n ? '<div class="small muted">兩個都關：直接跟 AI 聊，不查資料。</div>' : ""));
 }
 
 function msgHTML(m){
@@ -123,7 +147,8 @@ function voiceHTML(){
 
 const REC = {
   mr: null, chunks: [], stream: null, timer: 0, cancel: false,
-  async start(){
+  async start(mode){
+    S.recMode = mode || "voice";       // voice：語音對話；dictate：聽寫到輸入框；ptt：長按說話，放開就送出
     TTSP.stop(); S.voiceSpeaking = false;
     if (!navigator.mediaDevices || !window.MediaRecorder) return toast("這個瀏覽器不能錄音");
     try { REC.stream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: true}}); }
@@ -139,6 +164,7 @@ const REC = {
     clearInterval(REC.timer);
     REC.timer = setInterval(() => {
       const l = $("#voice-label");
+      if (S.recMode !== "voice") return;
       if (l && S.rec.state === "rec") l.textContent = "正在聽 " + fmtT((Date.now() - S.rec.start) / 1000) + "　說完再點一下";
       if (Date.now() - S.rec.start > 180000) REC.stop();          // 最多 3 分鐘
     }, 500);
@@ -157,8 +183,13 @@ const REC = {
     try {
       const r = await api("/stt", {method: "POST", body: blob, headers: {"Content-Type": blob.type.split(";")[0] || "audio/webm"}});
       S.rec = {state: "idle"};
+      if (S.recMode === "dictate"){
+        S.chatDraft = (S.chatDraft ? S.chatDraft.replace(/\s+$/, "") + " " : "") + r.text; S.cmpOpen = true; render();
+        const q = $("#chat-in"); if (q){ q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+        return;
+      }
       await chatSend(r.text);
-      speakLast();
+      if (S.recMode === "voice") speakLast();
     } catch (e) { S.rec = {state: "idle"}; render(); if (!e.relogin) toast(errMsg(e)); }
   }
 };

@@ -166,7 +166,17 @@ const ACT = {
   "chat-send": () => chatSend(($("#chat-in") || {}).value),
   "chat-opt": el => { const k = el.dataset.k; S.chatOpts[k] = !S.chatOpts[k]; lsSet("chat_" + k, S.chatOpts[k] ? null : "0"); render(); },
   "voice-mode": el => { S.voice = el.dataset.v === "1"; lsSet("voice", S.voice ? "1" : null); if (!S.voice && S.rec.state === "rec") REC.stop(true); render(); },
-  "mic": () => { if (S.rec.state === "rec") REC.stop(); else if (S.rec.state === "idle" && !S.chatPending) REC.start(); },
+  "mic": () => { if (S.rec.state === "rec") REC.stop(); else if (S.rec.state === "idle" && !S.chatPending) REC.start("voice"); },
+  "cmp-act": () => {
+    const v = ($("#chat-in") || {}).value || "";
+    if (v.trim()) return chatSend(v);
+    S.voice = true; lsSet("voice", "1"); render();           // 黑色按鈕：沒有字就進入語音對話
+  },
+  "cmp-mic": () => { if (S.rec.state === "rec") REC.stop(); else if (S.rec.state === "idle" && !S.chatPending) REC.start("dictate"); },
+  "cmp-menu": () => cmpMenu(),
+  "menu-kb": () => { S.chatOpts.kb = !S.chatOpts.kb; lsSet("chat_kb", S.chatOpts.kb ? null : "0"); cmpMenu(); render(); },
+  "menu-web": () => { S.chatOpts.web = !S.chatOpts.web; lsSet("chat_web", S.chatOpts.web ? null : "0"); cmpMenu(); render(); },
+  "menu-cite": () => { ACT["cite-toggle"](); cmpMenu(); },
   "mic-cancel": () => REC.stop(true),
   "chat-example": el => chatSend(el.dataset.q),
   "pin-sheet": () => pinSheet(),
@@ -459,7 +469,15 @@ document.addEventListener("input", e => {
   const el = e.target, d = el.dataset && el.dataset.draft;
   if (d === "ask") S.ask.draft = el.value;
   else if (el.id === "pin-q"){ S.pinUI.q = el.value; pinRedraw(); }
-  else if (d === "chat"){ S.chatDraft = el.value; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 160) + "px"; }
+  else if (d === "chat"){
+    S.chatDraft = el.value; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 160) + "px";
+    const c = $("#cmp"), has = !!el.value.trim();
+    if (c && c.classList.contains("has-text") !== has){
+      c.classList.toggle("has-text", has);
+      const b = c.querySelector("[data-act=cmp-act]"); if (b){ b.innerHTML = has ? SEND : WAVE; b.setAttribute("aria-label", has ? "送出" : "語音對話"); }
+    }
+    if (c && el.value) c.classList.add("open");
+  }
   else if (d === "bookq") S.ask.bookDraft = el.value;
   else if (d === "lecq") S.ask.lecDraft = el.value;
   else if (d === "tts") S.tts.text = el.value;
@@ -550,3 +568,23 @@ window.addEventListener("popstate", () => { closeSheet(); fromHash(); render.las
   if (!S.token){ showGate(); return; }
   render(); load(); pollJobs(true);
 })();
+
+/* 輸入框：點進去展開；長按（沒打字時）直接說話，放開就送出 */
+document.addEventListener("focusin", e => { if (e.target.id === "chat-in"){ S.cmpOpen = true; const c = $("#cmp"); if (c) c.classList.add("open"); } });
+document.addEventListener("focusout", e => {
+  if (e.target.id !== "chat-in") return;
+  setTimeout(() => { const c = $("#cmp"), q = $("#chat-in"); if (c && q && document.activeElement !== q && !q.value && !c.contains(document.activeElement)){ S.cmpOpen = false; c.classList.remove("open"); } }, 150);
+});
+const PTT = {timer: 0, on: false, x: 0, y: 0};
+document.addEventListener("pointerdown", e => {
+  const q = e.target.id === "chat-in" ? e.target : null;
+  if (!q || q.value || S.chatPending || S.rec.state !== "idle") return;
+  PTT.x = e.clientX; PTT.y = e.clientY;
+  PTT.timer = setTimeout(() => { PTT.on = true; q.blur(); if (navigator.vibrate) navigator.vibrate(30); REC.start("ptt"); }, 450);
+});
+document.addEventListener("pointermove", e => { if (PTT.timer && Math.hypot(e.clientX - PTT.x, e.clientY - PTT.y) > 12){ clearTimeout(PTT.timer); PTT.timer = 0; } });
+["pointerup", "pointercancel"].forEach(ev => document.addEventListener(ev, () => {
+  clearTimeout(PTT.timer); PTT.timer = 0;
+  if (PTT.on){ PTT.on = false; if (S.rec.state === "rec") REC.stop(); }
+}));
+document.addEventListener("contextmenu", e => { if (e.target.id === "chat-in" && (PTT.on || PTT.timer)) e.preventDefault(); });

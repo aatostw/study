@@ -446,3 +446,34 @@ h1,h2{color:var(--primary-text)}
 .pin-t{font-weight:700;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pin-det{border:0;background:var(--surface);border-radius:8px;padding:3px 10px;font-size:12.5px;color:var(--primary-text)}
 .pin-sub{grid-column:1 / -1;padding-left:30px}
+
+/* ---------- 助理輸入框（像 Claude） ---------- */
+.ellip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.cmp{display:grid;grid-template-columns:auto 1fr auto auto;grid-template-areas:"plus input mic act";align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:7px;box-shadow:0 2px 10px rgba(0,0,0,.06);transition:border-radius .15s}
+.cmp textarea{grid-area:input;border:0;outline:0;resize:none;background:none;font:inherit;font-size:16px;line-height:1.5;padding:8px 4px;min-height:24px;max-height:160px;color:var(--ink)}
+.cmp textarea::placeholder{color:var(--muted)}
+.cmp .plus{grid-area:plus}
+.cmp .mic{grid-area:mic}
+.cmp .cmp-act{grid-area:act}
+.cmp .cmp-chip{grid-area:chip;display:none}
+.cmp-btn{width:42px;height:42px;border-radius:50%;border:0;background:var(--field);color:var(--ink);display:grid;place-items:center;flex:none}
+.cmp-btn svg{width:20px;height:20px}
+.cmp-btn.mic.on{background:var(--danger);color:#fff;animation:pulse 1.4s infinite}
+.cmp-act{width:42px;height:42px;border-radius:50%;border:0;background:#1f1f1f;color:#fff;display:grid;place-items:center;flex:none}
+.cmp-act svg{width:20px;height:20px}
+.cmp.has-text .cmp-act{background:var(--primary)}
+.cmp-chip{border:0;background:var(--field);border-radius:999px;padding:0 16px;height:42px;font-size:14.5px;color:var(--ink);justify-self:start;white-space:nowrap}
+.cmp.open{grid-template-columns:auto auto 1fr auto auto;grid-template-areas:"input input input input input" "plus chip . mic act";border-radius:26px;padding:8px 10px 10px}
+.cmp.open textarea{padding:6px 8px 4px}
+.cmp.open .cmp-chip{display:block}
+.cmp.recording{border-color:var(--danger);box-shadow:0 0 0 3px color-mix(in srgb,var(--danger) 20%,transparent)}
+.composer .pins{margin-bottom:2px}
+.menu-sw{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;text-align:left;border:0;background:var(--field);border-radius:14px;padding:12px 14px;color:inherit}
+.menu-sw > span:first-child{display:flex;flex-direction:column;gap:2px}
+.menu-sw:disabled{opacity:.75}
+.sw{width:44px;height:26px;border-radius:999px;background:#c9cfd6;position:relative;flex:none;transition:background .15s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .15s}
+.sw.on{background:var(--primary)}
+.sw.on::after{left:21px}
+.cmp textarea{box-shadow:none;border-radius:0;flex:none}
+.cmp-btn,.cmp-act,.cmp-chip{box-shadow:none!important}
