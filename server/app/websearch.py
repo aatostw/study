@@ -72,8 +72,11 @@ def search_images(query, n=8):
         u = x.get("img_src") or ""
         if u.startswith("//"):
             u = "https:" + u
+        th = x.get("thumbnail_src") or ""
+        if th.startswith("//"):
+            th = "https:" + th
         if u.startswith("http"):
-            out.append({"img": u, "page": x.get("url") or "", "title": x.get("title") or ""})
+            out.append({"img": u, "thumb": th if th.startswith("http") else "", "page": x.get("url") or "", "title": x.get("title") or ""})
         if len(out) >= n:
             break
     return out

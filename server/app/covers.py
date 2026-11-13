@@ -34,23 +34,33 @@ def _img(data):
     return im
 
 
-def _looks_like_cover(im):
+def _looks_like_cover(im, small=False):
     w, h = im.size
-    return w >= 120 and h >= 170 and 0.5 <= w / h <= 0.9
+    return w >= (90 if small else 120) and h >= (120 if small else 170) and 0.45 <= w / h <= 0.95
 
 
-def _download(url):
+def _download(url, why, small=False, check_robots=True):
+    """下載一張圖；失敗的原因記在 why（方便在伺服器視窗看為什麼沒找到）"""
     if config.FAKE:
         return None
     try:
-        if not websearch._allowed(url):
+        if check_robots and not websearch._allowed(url):
+            why["robots"] = why.get("robots", 0) + 1
             return None
         r = httpx.get(url, headers={"User-Agent": UA}, timeout=12, follow_redirects=True)
-        if r.status_code != 200 or len(r.content) > 6 * 1024 * 1024 or not r.headers.get("content-type", "").startswith("image"):
+        if r.status_code != 200:
+            why["http%d" % r.status_code] = why.get("http%d" % r.status_code, 0) + 1
+            return None
+        if len(r.content) > 6 * 1024 * 1024 or not r.headers.get("content-type", "").startswith("image"):
+            why["不是圖片"] = why.get("不是圖片", 0) + 1
             return None
         im = _img(r.content)
-        return im if _looks_like_cover(im) else None
-    except Exception:
+        if not _looks_like_cover(im, small):
+            why["形狀不像封面"] = why.get("形狀不像封面", 0) + 1
+            return None
+        return im
+    except Exception as e:
+        why[type(e).__name__] = why.get(type(e).__name__, 0) + 1
         return None
 
 
@@ -67,14 +77,19 @@ def _candidates(b):
                 links = (it.get("volumeInfo") or {}).get("imageLinks") or {}
                 u = links.get("thumbnail") or links.get("smallThumbnail")
                 if u:
-                    out.append(("google", u.replace("http://", "https://").replace("&edge=curl", "").replace("zoom=1", "zoom=2")))
+                    out.append(("google", u.replace("http://", "https://").replace("&edge=curl", "").replace("zoom=1", "zoom=2"), ""))
         except Exception:
             pass
-        out.append(("openlibrary", "https://covers.openlibrary.org/b/isbn/%s-L.jpg?default=false" % isbn))
+        out.append(("openlibrary", "https://covers.openlibrary.org/b/isbn/%s-L.jpg?default=false" % isbn, ""))
     try:
         q = "%s %s 書 封面" % (b["title"], b.get("author") or "")
-        for h in websearch.search_images(q.strip(), n=8):
-            out.append(("search", h["img"]))
+        from .textutil import to_trad
+        key = to_trad(re.sub(r"[\s：:，,（）()]", "", b["title"]))[:8]
+        hits = websearch.search_images(q.strip(), n=12)
+        # 圖片標題裡有書名的排前面（比較可能是這本書，不是別的書或廣告圖）
+        hits.sort(key=lambda h: 0 if key and key in to_trad(re.sub(r"\s", "", h.get("title") or "")) else 1)
+        for h in hits:
+            out.append(("search", h["img"], h.get("thumb") or ""))
     except Exception as e:
         print("  [封面] 圖片搜尋失敗：%s" % e, flush=True)
     return out
@@ -104,14 +119,20 @@ def find(bid, prog=None):
     if prog:
         prog("找封面", 0.2)
     cands = _candidates(b)
-    imgs = []
-    for src, u in cands[:10]:
-        im = _download(u)
+    imgs, why = [], {}
+    for src, u, thumb in cands[:12]:
+        im = _download(u, why)
+        if im is None and thumb:        # 原圖抓不到（網站擋、太大）：改用搜尋引擎的縮圖
+            im = _download(thumb, why, small=True, check_robots=False)
         if im is not None:
             imgs.append((src, im))
         if not photo and imgs:          # 沒有照片可以核對：第一張可靠的就用
             break
-    print("  [封面] 《%s》找到 %d 個候選，下載成功 %d 張%s" % (b["title"], len(cands), len(imgs), "，有你拍的照片可以核對" if photo else ""), flush=True)
+        if photo and len(imgs) >= 6:
+            break
+    print("  [封面] 《%s》找到 %d 個候選，下載成功 %d 張%s%s" % (
+        b["title"], len(cands), len(imgs), "，有你拍的照片可以核對" if photo else "",
+        ("（失敗：" + "、".join("%s %d" % kv for kv in why.items()) + "）") if why else ""), flush=True)
     if photo and imgs:
         if prog:
             prog("用你拍的照片核對封面", 0.7)
