@@ -11,21 +11,17 @@
 <title>學習筆記</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icons/icon.svg">
+<link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=39">
+<link rel="stylesheet" href="css/app.css?v=40">
 </head>
 <body>
 <div class="app" id="app">
   <header class="top">
-    <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">
-      <rect x="2" y="7" width="17" height="19" rx="5" fill="#39648D"/>
-      <rect x="10" y="3" width="17" height="19" rx="5" fill="#48A88B"/>
-      <circle cx="23" cy="24" r="4" fill="#F3CC58"/>
-    </svg>
-    <span class="name">學習筆記</span>
+    <button id="brand" aria-label="切換 App（目前：學習筆記）"><svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 8.2C11.2 5.6 6.8 5 3 6.1v17.8c3.8-1.1 8.2-.5 12 2.1z" fill="#39648D"/><path d="M15 8.2c3.8-2.6 8.2-3.2 12-2.1v17.8c-3.8-1.1-8.2-.5-12 2.1z" fill="#48A88B"/><path d="M19.6 3.6h4.2v8.6l-2.1-1.7-2.1 1.7z" fill="#F3CC58"/></svg><span class="name">學習筆記</span><svg class="brand-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <span class="spacer"></span>
     <button id="pill" class="pill" data-act="tab" data-v="prefs">連線中</button>
   </header>
@@ -56,14 +52,15 @@
   <input type="file" id="pick-photo" accept="image/*" capture="environment" hidden>
 </div>
 
-<script src="js/core.js?v=39"></script>
-<script src="js/upload.js?v=39"></script>
-<script src="js/pages.js?v=39"></script>
-<script src="js/lecture.js?v=39"></script>
-<script src="js/wish.js?v=39"></script>
-<script src="js/assist.js?v=39"></script>
-<script src="js/shelf.js?v=39"></script>
-<script src="js/settings.js?v=39"></script>
-<script src="js/actions.js?v=39"></script>
+<script src="js/core.js?v=40"></script>
+<script src="js/upload.js?v=40"></script>
+<script src="js/pages.js?v=40"></script>
+<script src="js/lecture.js?v=40"></script>
+<script src="js/wish.js?v=40"></script>
+<script src="js/assist.js?v=40"></script>
+<script src="js/shelf.js?v=40"></script>
+<script src="js/settings.js?v=40"></script>
+<script src="js/apps.js?v=40"></script>
+<script src="js/actions.js?v=40"></script>
 </body>
 </html>
