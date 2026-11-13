@@ -365,7 +365,9 @@ const ACT = {
   "book-new": () => { S.wishKeep = null; S.coverPhoto = null; wishSheet({}); },
   "book-edit": () => { const b = S.book.book; openSheet('<h2>編輯書的資料</h2><div class="field"><label for="b-title">書名</label><input class="input" id="b-title" value="' + esc(b.title) + '"></div>' +
     '<div class="field"><label for="b-author">作者</label><input class="input" id="b-author" value="' + esc(b.author) + '"></div><button class="btn block" data-act="book-save">儲存</button>' +
-    '<div class="label" style="margin-top:6px">原文與匯出</div>' + (b.file_name ? '<div class="tiny muted">原文：' + esc(b.file_name) + "</div>" : "") + (b.isbn ? '<div class="tiny muted en">ISBN ' + esc(b.isbn) + "</div>" : "") +
+    '<div class="label" style="margin-top:6px">封面、原文與匯出</div>' +
+    '<div class="row wrap"><button class="btn soft sm" data-act="cover-sheet">' + ICON.camera + "換封面</button></div>" +
+    (b.file_name ? '<div class="tiny muted">原文：' + esc(b.file_name) + "</div>" : "") + (b.isbn ? '<div class="tiny muted en">ISBN ' + esc(b.isbn) + "</div>" : "") +
     '<div class="row wrap"><button class="btn soft sm" data-act="pick-book" data-id="' + b.id + '">' + ICON.upload + (b.file_name ? "換原文檔" : "上傳原文 PDF／EPUB") + "</button>" +
     '<button class="btn soft sm" data-act="book-export" data-id="' + b.id + '">' + ICON.down + "匯出筆記</button></div>" +
     '<button class="btn ghost block" data-act="book-del" style="color:var(--danger)">刪除這本書（含所有筆記）</button>'); },

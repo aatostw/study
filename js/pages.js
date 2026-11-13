@@ -83,12 +83,10 @@ function renderBook(){
   const evLive = jobs.find(j => j.ref_id === b.id && j.kind === "evaluate" && j.status !== "done") || (job && job.kind === "evaluate" ? job : null);
   const sh = b.shelf || "reading";
   let html = pageTop("我的書", '<button class="btn soft sm" data-act="book-edit">' + ICON.edit + "編輯</button>") +
-    '<section class="card hero"><div class="row between"><div class="seg shelf-seg" role="group" aria-label="狀態">' +
-    ["wish", "reading", "done"].map(v => '<button data-act="shelf-set" data-v="' + v + '" aria-pressed="' + (sh === v) + '">' + SHELF[v] + "</button>").join("") + "</div>" +
-    starBtn("book", b.id, b.starred) + "</div>" +
-    '<div class="hero-book"><button class="hero-cover" data-act="cover-sheet" aria-label="換封面">' + coverHTML(b) + '<span class="hc-edit">換封面</span></button>' +
-    "<div><h1>" + esc(b.title) + "</h1>" + (b.author ? '<div class="sub">' + esc(b.author) + "</div>" : "") + "</div></div>" +
-    '<div class="row wrap"><span class="chip">' + notes.length + " 則筆記</span></div></section>";
+    '<section class="card hero book-hero"><div class="row between bh-head"><h1>' + esc(b.title) + "</h1>" + starBtn("book", b.id, b.starred) + "</div>" +
+    (b.author ? '<div class="sub">' + esc(b.author) + "</div>" : "") +
+    '<div class="row between bh-foot"><span class="chip">' + notes.length + ' 則筆記</span><div class="seg shelf-seg" role="group" aria-label="狀態">' +
+    ["wish", "reading", "done"].map(v => '<button data-act="shelf-set" data-v="' + v + '" aria-pressed="' + (sh === v) + '">' + SHELF[v] + "</button>").join("") + "</div></div></section>";
   html += uploadsHTML("book");
   if (S.busy.ocr) html += '<div class="note"><div class="row"><span class="spinner"></span>正在辨識照片裡的文字…</div></div>';
   if (live && live.status !== "done") html += jobCard(live);
