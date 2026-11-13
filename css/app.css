@@ -581,3 +581,4 @@ h1,h2{color:var(--primary-text)}
 #appsw .appsw-cur{font-size:12px;color:var(--muted,#64748b)}
 #appsw .appsw-go{font-size:20px;color:var(--muted,#64748b)}
 #brand[hidden]{display:none}
+.pill[hidden]{display:none}
