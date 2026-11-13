@@ -52,6 +52,7 @@ function srcRow(s, ctx){
   const kind = {note: "筆記", book: "原文", lecture: "課程", web: "網路"}[s.kind] || "";
   return '<button class="src' + (s.cited ? " cited" : "") + '" data-act="src" data-ctx="' + ctx + '" data-n="' + s.n + '"><span class="n">' + s.n + '</span><span class="body"><span class="lbl">' +
     '<span class="chip ' + (s.kind === "lecture" ? "green" : s.kind === "note" ? "yellow" : s.kind === "web" ? "" : "blue") + '" style="padding:0 7px;font-size:12px;margin-right:6px">' + kind + "</span>" + esc(s.label) + (s.domain ? '<span class="tiny muted">　' + esc(s.domain) + "</span>" : "") +
+    (s.level ? '<span class="rel rel-' + ({"高": "hi", "中": "mid"}[s.level] || "lo") + '">相關度 ' + s.level + "</span>" : "") +
     '</span><div class="snip clamp2">' + esc(s.text) + "</div></span></button>";
 }
 function sourceSheet(s){

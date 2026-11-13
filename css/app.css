@@ -426,3 +426,7 @@ h1,h2{color:var(--primary-text)}
 .scope-mini .tog{display:inline-flex;align-items:center;gap:6px;padding:5px 12px 5px 8px}
 .tog .box{width:16px;height:16px;border-radius:5px;border:1.5px solid var(--muted);display:grid;place-items:center;font-size:11px;font-weight:900;line-height:1}
 .tog[aria-pressed="true"] .box{background:var(--primary);border-color:var(--primary);color:#fff}
+.rel{display:inline-block;margin-left:6px;font-size:11px;font-weight:700;padding:0 6px;border-radius:6px;vertical-align:1px}
+.rel-hi{background:var(--green-soft);color:var(--green-text)}
+.rel-mid{background:var(--yellow-soft);color:#8a6400}
+.rel-lo{background:var(--field);color:var(--muted)}

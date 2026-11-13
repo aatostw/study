@@ -75,6 +75,45 @@ def embed(texts):
         return [v.tolist() for v in vecs]
 
 
+# ---------- 重新排名（cross-encoder）----------
+_rr = {"model": None}
+_rr_lock = threading.Lock()
+
+
+def rerank(query, texts):
+    """每段跟問題的相關分數（0～1）。模型載入失敗就回傳 None，呼叫的地方改用原本的順序"""
+    if not texts:
+        return []
+    if config.FAKE:
+        return fake.rerank(query, texts)
+    with _rr_lock:
+        if _rr["model"] is None:
+            if state.get("rerank") == "error":
+                return None
+            state["rerank"] = "loading"
+            try:
+                _cuda_dlls()
+                from sentence_transformers import CrossEncoder
+                dev = "cuda" if gpu_ok() else "cpu"
+                _rr["model"] = CrossEncoder(config.RERANK_MODEL, device=dev, max_length=512)
+                if dev == "cuda":
+                    _rr["model"].model.half()
+                state["rerank"] = "ready"
+            except Exception as e:
+                state["rerank"], state["rerank_error"] = "error", str(e)[:300]
+                print("  [重新排名] 載入失敗，改用原本的順序：%s" % e, flush=True)
+                return None
+        try:
+            import torch
+            scores = _rr["model"].predict([(query, t[:1500]) for t in texts], batch_size=16,
+                                          activation_fn=torch.nn.Sigmoid(), show_progress_bar=False)
+        except TypeError:   # 舊版 sentence-transformers 參數名稱不同
+            import torch
+            scores = _rr["model"].predict([(query, t[:1500]) for t in texts], batch_size=16,
+                                          activation_fct=torch.nn.Sigmoid(), show_progress_bar=False)
+        return [float(s) for s in scores]
+
+
 # ---------- Whisper ----------
 _asr = {"model": None, "last": 0.0}
 _asr_lock = threading.Lock()

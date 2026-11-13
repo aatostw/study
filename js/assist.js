@@ -55,7 +55,10 @@ function msgHTML(m){
   let html = '<div class="msg ai"><div class="bubble" data-read="助理的回答"><div class="rich">' + richHTML(m.content, ctx) + "</div>";
   if (m.card && m.card.type === "eval") html += '<div class="no-read">' + evalCardHTML(m.card.book_id) + "</div>";
   html += '<div class="row between no-read msg-foot">' + (m.content ? readBtn() : "") + (m.model ? '<span class="tiny muted">' + esc(m.model) + "</span>" : "") + "</div>";
-  if (cited.length) html += '<details class="no-read"><summary class="small muted">出處（' + cited.length + '）</summary><div class="stack" style="margin-top:8px">' + cited.map(s => srcRow(s, ctx)).join("") + "</div></details>";
+  const others = (m.sources || []).filter(s => !s.cited);
+  if (cited.length || others.length) html += '<details class="no-read"><summary class="small muted">出處（' + cited.length + "）" + (others.length ? "・其他參考 " + others.length : "") + '</summary><div class="stack" style="margin-top:8px">' +
+    cited.map(s => srcRow(s, ctx)).join("") +
+    (others.length ? '<div class="tiny muted" style="margin-top:4px">也有讀，但回答沒有引用：</div>' + others.map(s => srcRow(s, ctx)).join("") : "") + "</div></details>";
   return html + "</div></div>";
 }
 

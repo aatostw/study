@@ -30,6 +30,7 @@ TUNNEL_NAME = _get("TUNNEL_NAME", "")
 ASR_MODEL = _get("ASR_MODEL", "large-v3-turbo")
 ASR_IDLE_UNLOAD_MIN = _get("ASR_IDLE_UNLOAD_MIN", 10)
 EMBED_MODEL = _get("EMBED_MODEL", "BAAI/bge-m3")
+RERANK_MODEL = _get("RERANK_MODEL", "BAAI/bge-reranker-v2-m3")   # 重新排名：中英都準，約 1GB
 MAX_UPLOAD_GB = _get("MAX_UPLOAD_GB", 8)
 REF_ZH_AUDIO = _get("REF_ZH_AUDIO", "")
 REF_ZH_TEXT = _get("REF_ZH_TEXT", "")

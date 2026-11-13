@@ -120,7 +120,7 @@ def source_view(r):
     score = float(r.get("score") or 0)
     if math.isnan(score):
         score = 0.0
-    return {"kind": r["kind"], "label": label, "text": r["text"], "score": round(score, 3),
+    return {"cid": r.get("id"), "kind": r["kind"], "label": label, "text": r["text"], "score": round(score, 3),
             "book_id": r.get("book_id"), "note_id": r.get("note_id"), "lecture_id": r.get("lecture_id"),
             "t0": r.get("t0"), "page": r.get("page"), "chapter": r.get("chapter")}
 

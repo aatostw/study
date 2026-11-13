@@ -97,3 +97,9 @@ def generate(task, prompt, json_mode):
     if task == "ocr":
         return "（測試）照片辨識出的文字：道可道，非常道。名可名，非常名。"
     return "根據你的資料，道被認為無法用語言完全說明 [1]，而無為的意思是不刻意、不強求 [2]。（測試模式回答）"
+
+
+def rerank(query, texts):
+    """測試用：看問題裡的字出現多少"""
+    qs = set(c for c in query if not c.isspace())
+    return [min(1.0, len(qs & set(t)) / max(1, len(qs))) for t in texts]

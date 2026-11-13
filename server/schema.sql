@@ -200,3 +200,6 @@ DROP TRIGGER IF EXISTS notes_auto_reading ON notes;
 CREATE TRIGGER notes_auto_reading AFTER INSERT ON notes FOR EACH ROW EXECUTE FUNCTION book_auto_reading();
 DROP TRIGGER IF EXISTS books_auto_reading ON books;
 CREATE TRIGGER books_auto_reading BEFORE UPDATE OF file_name ON books FOR EACH ROW EXECUTE FUNCTION book_auto_reading();
+
+-- 助理：每則回答留下這次的候選資料，追問時跟新搜到的一起重新排名
+ALTER TABLE chat_msgs ADD COLUMN IF NOT EXISTS pool jsonb;

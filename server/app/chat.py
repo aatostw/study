@@ -7,7 +7,7 @@ import re
 import concurrent.futures as cf
 from urllib.parse import urlparse
 
-from . import ai, db, jobs, knowledge, websearch
+from . import ai, db, engines, jobs, knowledge, websearch
 from .db import Jsonb
 
 EVAL_RE = re.compile(r"(評估|值不值得[讀看買]|值得[讀看]嗎|該不該讀|適不適合我)")
@@ -26,6 +26,7 @@ def _eval_title(msg):
 
 def _msg(row):
     row = dict(row)
+    row.pop("pool", None)
     row["created_at"] = row["created_at"].isoformat()
     return row
 
@@ -71,18 +72,62 @@ def _web_sources(query, start_n):
     return out
 
 
-def respond(text, history, use_kb=True, use_web=False):
-    """依照開關回答：書櫃為主／網路搜尋／都不開就直接聊"""
+POOL_KB, POOL_WEB, KEEP = 25, 6, 8
+
+
+def _key(s):
+    return "web:" + s["url"] if s["kind"] == "web" else "kb:%s" % (s.get("cid") or s["label"] + s["text"][:40])
+
+
+def _rank(query, cands, cited_keys, use_kb):
+    """本機重新排名，加權後只留最相關的幾段。排序模型不能用時，退回原本的向量分數。"""
+    scores = engines.rerank(query, [c["text"] for c in cands])
+    ranked = []
+    for i, c in enumerate(cands):
+        base = scores[i] if scores is not None else float(c.get("score") or 0.5) * (0.97 ** i)
+        w = base
+        if _key(c) in cited_keys:
+            w += 0.08                      # 上一輪真的引用過：跟這段對話有關
+        if use_kb and c["kind"] != "web":
+            w += 0.05                      # 引用書櫃為主：書櫃資料優先
+        c = dict(c, rel=round(base, 3), weight=round(w, 3))
+        ranked.append(c)
+    ranked.sort(key=lambda c: -c["weight"])
+    top = [c for c in ranked if c["rel"] >= 0.08 or scores is None][:KEEP]
+    if len(top) < 3:
+        top = ranked[:min(3, len(ranked))]
+    for c in top:
+        c["level"] = "高" if c["rel"] >= 0.6 else "中" if c["rel"] >= 0.25 else "低"
+    return top, ranked[:40], scores is not None
+
+
+def respond(text, history, use_kb=True, use_web=False, prev_pool=None, cited_keys=()):
+    """依照開關回答：書櫃為主／網路搜尋／都不開就直接聊。
+    追問時，上一題的候選資料和這題新搜到的合在一起重新排名，只留 6～8 段給 AI。"""
     search_text = text if len(text) >= 16 or not history else history[-1][0] + "\n" + text
-    sources, note = [], ""
+    note, cands, seen = "", [], set()
+
+    def add(c):
+        k = _key(c)
+        if k not in seen:
+            seen.add(k)
+            cands.append(c)
     if use_kb:
-        for s in knowledge.search(search_text, "all", 8 if use_web else 10):
-            sources.append(s)
+        for s in knowledge.search(search_text, "all", POOL_KB):
+            add(s)
     if use_web:
         try:
-            sources += _web_sources(search_text.replace("\n", " ")[:200], len(sources) + 1)
+            for s in _web_sources(search_text.replace("\n", " ")[:200], 1):
+                add(s)
         except Exception as e:
             note = "（網路搜尋現在連不到：%s）\n\n" % e
+    for c in prev_pool or []:      # 上一題的候選，照這次的開關過濾
+        if (c["kind"] == "web" and use_web) or (c["kind"] != "web" and use_kb):
+            add(c)
+
+    sources, pool, reranked = [], [], False
+    if cands:
+        sources, pool, reranked = _rank(text if not history else search_text, cands, set(cited_keys), use_kb)
     for i, s in enumerate(sources, 1):
         s["n"] = i
     hist = ""
@@ -90,8 +135,11 @@ def respond(text, history, use_kb=True, use_web=False):
         hist = "先前的對話（只用來理解問題在指什麼）：\n" + "\n".join(
             "使用者：%s\n助理：%s" % (q, re.sub(r"\[\d{1,2}\]", "", a)[:600]) for q, a in history[-3:]) + "\n\n"
     if sources:
-        blocks = "\n\n".join("[%d] %s%s\n%s" % (s["n"], "（網路）" if s["kind"] == "web" else "（書櫃）", s["label"], s["text"]) for s in sources)
-        prompt = "資料：\n\n" + blocks + "\n\n" + hist + "問題：" + text
+        # 最相關的放最後、最靠近問題（模型對開頭和結尾讀得最仔細）
+        blocks = "\n\n".join("[%d]（相關度：%s）%s%s\n%s" % (s["n"], s["level"], "（網路）" if s["kind"] == "web" else "（書櫃）", s["label"], s["text"])
+                             for s in reversed(sources))
+        prompt = ("資料（已依相關度排序，越下面越相關；相關度「高」的優先依據，「低」的只在需要時參考）：\n\n"
+                  + blocks + "\n\n" + hist + "問題：" + text)
         system = SYSTEM_KB if use_kb else SYSTEM_WEB
     else:
         if use_kb and not use_web and not note:
@@ -102,7 +150,8 @@ def respond(text, history, use_kb=True, use_web=False):
     cited = {int(n) for n in re.findall(r"\[(\d{1,2})\]", answer)}
     for s in sources:
         s["cited"] = s["n"] in cited
-    return {"answer": note + answer, "sources": sources, "model": used}
+    slim = [{k: v for k, v in c.items() if k not in ("n", "cited", "level")} for c in pool]
+    return {"answer": note + answer, "sources": sources, "model": used, "pool": slim, "reranked": reranked}
 
 
 def send(chat_id, text, scope="all", use_kb=True, use_web=False):
@@ -113,7 +162,8 @@ def send(chat_id, text, scope="all", use_kb=True, use_web=False):
     else:
         chat = db.one("INSERT INTO chats (title) VALUES (%s) RETURNING *", (text[:40],))
     cid = chat["id"]
-    prev = db.all("SELECT role, content FROM chat_msgs WHERE chat_id = %s ORDER BY id DESC LIMIT 6", (cid,))[::-1]
+    prev = db.all("SELECT role, content, pool, sources FROM chat_msgs WHERE chat_id = %s ORDER BY id DESC LIMIT 6", (cid,))[::-1]
+    last_ai = next((m for m in reversed(prev) if m["role"] == "assistant"), None)
     scope = ("kb" if use_kb else "") + ("+web" if use_web else "") or "free"
     user = db.one("INSERT INTO chat_msgs (chat_id, role, content, scope) VALUES (%s, 'user', %s, %s) RETURNING *", (cid, text, scope))
 
@@ -134,9 +184,11 @@ def send(chat_id, text, scope="all", use_kb=True, use_web=False):
                 history.append((q, m["content"]))
                 q = None
         # 短的追問（「那他怎麼說？」）會帶上一題一起找資料
-        r = respond(text, history, use_kb, use_web)
-        reply = db.one("INSERT INTO chat_msgs (chat_id, role, content, scope, sources, model) VALUES (%s, 'assistant', %s, %s, %s, %s) RETURNING *",
-                       (cid, r["answer"], scope, Jsonb(r["sources"]), r["model"]))
+        r = respond(text, history, use_kb, use_web,
+                    prev_pool=(last_ai or {}).get("pool") or [],
+                    cited_keys=[_key(s) for s in ((last_ai or {}).get("sources") or []) if s.get("cited")])
+        reply = db.one("INSERT INTO chat_msgs (chat_id, role, content, scope, sources, model, pool) VALUES (%s, 'assistant', %s, %s, %s, %s, %s) RETURNING *",
+                       (cid, r["answer"], scope, Jsonb(r["sources"]), r["model"], Jsonb(r["pool"])))
     db.run("UPDATE chats SET updated_at = now() WHERE id = %s", (cid,))
     return {"chat": {"id": cid, "title": chat["title"]}, "messages": [_msg(user), _msg(reply)]}
 
