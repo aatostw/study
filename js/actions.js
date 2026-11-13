@@ -505,9 +505,22 @@ const ACT = {
     (s.sections || []).forEach(sec => { lines.push(sec.title + "。" + (sec.summary || "")); (sec.points || []).forEach(p => lines.push(p.text)); });
     readAloud(lines.filter(Boolean).join("\n"), l.title);
   },
+  "lec-export-sheet": () => lecExportSheet(),
+  "lexp-set": el => { S.lexp[el.dataset.k] = el.dataset.v; lecExportSheet(); },
+  "lexp-go": () => {
+    const E = S.lexp, l = S.lecture.lecture;
+    const text = lecExportText(E.what, E.fmt);
+    const name = safeName(l.title) + (E.what === "sum" ? "－摘要" : E.what === "tr" && E.fmt !== "srt" ? "－逐字稿" : "") + "." + E.fmt;
+    const blob = new Blob(["\ufeff" + text], {type: {md: "text/markdown", txt: "text/plain", srt: "application/x-subrip"}[E.fmt] + ";charset=utf-8"});
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+    closeSheet(); toast("已匯出：" + name);
+  },
+  "lec-regen": () => lecRegenSheet(),
   "lec-export": () => act("export", () => download("/lectures/" + S.sub.id + "/export", safeName(S.lecture.lecture.title) + ".md")),
-  "lec-resum": () => act("resum", async () => { await api("/lectures/" + S.sub.id + "/resummarize", {method: "POST"}); toast("開始重新摘要"); pollJobs(true); await loadLecture(); }),
+  "lec-resum": () => act("resum", async () => { closeSheet(); await api("/lectures/" + S.sub.id + "/resummarize", {method: "POST"}); toast("開始重新摘要"); pollJobs(true); await loadLecture(); }),
   "lec-retrans": async () => {
+    closeSheet();
     if (!(await confirmBox("重新轉逐字稿？", "會刪掉現在的逐字稿和摘要，用最新的術語重新辨識。", "重新轉"))) return;
     act("retrans", async () => { await api("/lectures/" + S.sub.id + "/retranscribe", {method: "POST"}); pollJobs(true); await loadLecture(); });
   },

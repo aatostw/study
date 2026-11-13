@@ -89,6 +89,7 @@ async function loadThumbs(){
 }
 function setVideo(lec){
   const box = $("#vbox");
+  $("#app").classList.toggle("has-video", !!(lec && (lec.youtube || lec.video_path)));
   const kind = !lec ? "" : lec.youtube ? "yt" : lec.video_path ? "file" : "";
   if (VID.lid === (lec && lec.id) && VID.kind === kind) return;
   VID.lid = lec ? lec.id : null; VID.kind = kind;
@@ -138,25 +139,68 @@ function seek(t){
 }
 
 function renderLecture(){
-  const back = pageTop("影片");
-  if (!S.lecture || S.lecture.lecture.id !== S.sub.id) return back + loading();
+  if (!S.lecture || S.lecture.lecture.id !== S.sub.id) return pageTop("影片") + loading();
   const {lecture: l, segments, job} = S.lecture;
   const live = (S.jobs || []).find(j => j.ref_id === l.id && (j.kind === "lecture" || j.kind === "resummarize") && j.status !== "done") || job;
-  let html = "";
+  let html = pageTop("影片", '<button class="btn soft sm" data-act="lec-export-sheet">' + ICON.down + "匯出</button>" +
+    '<button class="btn soft sm" data-act="lec-regen">' + ICON.spark + "重新生成</button>" +
+    '<button class="btn soft sm" data-act="lec-edit">' + ICON.edit + "編輯</button>" +
+    '<button class="btn soft sm" data-act="lec-del" style="color:var(--danger)">' + ICON.trash + "刪除</button>");
   if (l.audio_path && !l.video_path && !l.youtube) html += playerHTML(l);
-  html += back + '<section class="card hero green"><div class="row between"><div class="label">' + esc(l.course || "未分類") + "</div>" + starBtn("lecture", l.id, l.starred) + "</div><h1>" + esc(l.title) + "</h1>" +
+  html += '<section class="card hero green"><div class="row between"><div class="label">' + esc(l.course || "未分類") + "</div>" + starBtn("lecture", l.id, l.starred) + "</div><h1>" + esc(l.title) + "</h1>" +
     '<div class="row wrap"><span class="chip">' + fmtDate(l.created_at) + "</span>" + (l.duration ? '<span class="chip">' + fmtDur(l.duration) + "</span>" : "") +
     '<span class="chip">' + LANG_NAME[l.lang] + "</span>" + (l.summary_model ? '<span class="chip">' + esc(l.summary_model) + "</span>" : "") + "</div></section>";
   if (live && live.status !== "done") html += jobCard(live);
   if (!segments.length){
     if (!live || live.status === "done") html += '<div class="note">還沒有逐字稿。</div>';
-    return html + lectureMenu(l);
+    return html;
   }
   html += '<div class="seg" role="group">' + [["sum", "摘要"], ["tr", "逐字稿"]].map(o => '<button data-act="lec-tab" data-v="' + o[0] + '" aria-pressed="' + (S.lecTab === o[0]) + '">' + o[1] + "</button>").join("") + "</div>";
   if (S.lecTab === "tr") html += transcriptHTML(segments);
   else html += summaryHTML(l);
-  return html + lectureMenu(l);
+  return html;
 }
+
+/* 匯出：選內容和檔案格式（在手機上直接產生檔案） */
+function lecExportSheet(){
+  const hasSum = !!S.lecture.lecture.summary;
+  S.lexp = S.lexp || {what: hasSum ? "all" : "tr", fmt: "md"};
+  const seg = (name, opts, cur) => '<div class="seg" role="group">' + opts.map(o => '<button data-act="lexp-set" data-k="' + name + '" data-v="' + o[0] + '" aria-pressed="' + (cur === o[0]) + '"' + (o[2] ? " disabled" : "") + ">" + o[1] + "</button>").join("") + "</div>";
+  const E = S.lexp;
+  if (E.fmt === "srt") E.what = "tr";
+  openSheet("<h2>匯出</h2>" +
+    '<div class="field"><label>內容</label>' + seg("what", [["all", "全部", !hasSum || E.fmt === "srt"], ["sum", "摘要", !hasSum || E.fmt === "srt"], ["tr", "逐字稿"]], E.what) + "</div>" +
+    '<div class="field"><label>檔案格式</label>' + seg("fmt", [["md", "Markdown"], ["txt", "純文字"], ["srt", "字幕 SRT"]], E.fmt) + "</div>" +
+    '<div class="tiny muted">' + {md: "適合貼到 Notion、Obsidian，保留標題和清單。", txt: "沒有格式符號，任何地方都能打開。", srt: "影片字幕檔，只含逐字稿和時間。"}[E.fmt] + "</div>" +
+    '<button class="btn block" data-act="lexp-go">' + ICON.down + "下載</button>");
+}
+function lecExportText(what, fmt){
+  const {lecture: l, segments} = S.lecture, sm = l.summary || {};
+  const T = t => fmtT(t || 0);
+  if (fmt === "srt"){
+    const st = t => { t = Math.max(0, t || 0); const h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, sec = Math.floor(t % 60), ms = Math.round((t % 1) * 1000);
+      return [h, m, sec].map(x => String(x).padStart(2, "0")).join(":") + "," + String(ms).padStart(3, "0"); };
+    return segments.map((g, i) => (i + 1) + "\n" + st(g.t0) + " --> " + st(g.t1 || g.t0 + 3) + "\n" + g.text + "\n").join("\n");
+  }
+  const md = fmt === "md", H = (n, x) => md ? "#".repeat(n) + " " + x : x, B = x => md ? "- " + x : "・" + x;
+  const out = [H(1, (l.course ? l.course + "｜" : "") + l.title), ""];
+  if (what !== "tr"){
+    if (sm.overview) out.push(H(2, "總覽"), "", sm.overview, "");
+    (sm.sections || []).forEach(sec => { out.push(H(2, "[" + T(sec.start) + "] " + (sec.title || "")), "", sec.summary || "", ""); (sec.points || []).forEach(p => out.push(B("[" + T(p.t) + "] " + p.text))); out.push(""); });
+    if ((sm.details || []).length) out.push(H(2, "細節"), "", ...sm.details.map(d => B("（" + d.kind + "）[" + T(d.t) + "] " + d.text)), "");
+    if ((sm.terms || []).length) out.push(H(2, "術語"), "", ...sm.terms.map(t => B((md ? "**" + t.term + "**" : t.term) + "：" + t.explain)), "");
+    if ((sm.questions || []).length) out.push(H(2, "複習問題"), "", ...sm.questions.map((q, i) => (i + 1) + ". " + q), "");
+  }
+  if (what !== "sum"){ out.push(H(2, "逐字稿"), ""); segments.forEach(g => out.push("[" + T(g.t0) + "] " + g.text)); }
+  return out.join("\n");
+}
+function lecRegenSheet(){
+  const yt = !!S.lecture.lecture.youtube;
+  openSheet("<h2>重新生成</h2>" +
+    '<button class="list-row" data-act="lec-resum"><span class="ic green">' + ICON.spark + '</span><span class="t"><b>重新摘要</b><span class="sub">逐字稿不變，用目前設定的模型重寫摘要。換了模型或補了術語時用。</span></span><span class="chev">›</span></button>' +
+    '<button class="list-row" data-act="lec-retrans"><span class="ic">' + ICON.edit + '</span><span class="t"><b>重新轉逐字稿</b><span class="sub">' + (yt ? "請 Gemini 重新看一次影片，" : "重新辨識聲音，") + "逐字稿和摘要都會重做。錯字很多時用。</span></span><span class=\"chev\">›</span></button>");
+}
+
 function playerHTML(l){
   const au = $("#au"), dur = l.duration || au.duration || 0, cur = au.currentTime || 0;
   return '<div class="player"><div class="row"><button class="play" data-act="play" aria-label="播放／暫停" id="pl-btn">' + (au.paused ? ICON.play : ICON.pause) + "</button>" +
@@ -166,9 +210,9 @@ function playerHTML(l){
 }
 function summaryHTML(l){
   const s = l.summary;
-  if (!s) return '<section class="card"><div class="note warn">還沒有 AI 摘要。到「設定」選好「影片摘要」要用的模型，再按下面的「重新摘要」。</div></section>';
+  if (!s) return '<section class="card"><div class="note warn">還沒有 AI 摘要。到「設定」選好「影片摘要」要用的模型，再按右上角「重新生成」→「重新摘要」。</div></section>';
   let html = "";
-  if (s.overview) html += '<section class="card"><div class="label">總覽</div><p style="margin:0;line-height:1.8">' + esc(s.overview) + "</p></section>";
+  if (s.overview) html += '<section class="card"><div class="row between"><div class="label">總覽</div><button class="btn soft sm" data-act="lec-tts">' + ICON.speaker + "朗讀摘要</button></div>" + '<p style="margin:0;line-height:1.8">' + esc(s.overview) + "</p></section>";
   if ((s.sections || []).length){
     html += '<section class="card"><div class="label">單元（點時間直接跳到那裡）</div><div class="stack">' + s.sections.map(sec =>
       '<div class="sec"><h3>' + timeBtn(sec.start) + "<span>" + esc(sec.title) + "</span></h3>" +
@@ -200,16 +244,6 @@ function lectureAskHTML(l){
   return '<section class="card"><div class="label">只問這支影片</div><textarea class="input" id="lec-q" rows="2" placeholder="影片裡怎麼解釋…？舉了什麼例子？" data-draft="lecq">' + esc(S.ask.lecDraft || "") + "</textarea>" +
     '<button class="btn block green" data-act="ask-lec"' + (S.busy.askLec ? " disabled" : "") + ">" + (S.busy.askLec ? '<span class="spinner"></span>找答案中…' : "問") + "</button>" +
     (S.err.askLec ? errBox(esc(S.err.askLec), "err:askLec") : "") + "</section>" + (r ? answerHTML(r, "lec") : "");
-}
-function lectureMenu(l){
-  return '<section class="card flat"><div class="label">標題</div><div class="row wrap">' +
-    (l.summary ? '<button class="btn soft sm" data-act="lec-tts">' + ICON.speaker + "朗讀摘要</button>" : "") +
-    '<button class="btn soft sm" data-act="lec-export">' + ICON.down + "匯出 Markdown</button>" +
-    '<button class="btn soft sm" data-act="lec-resum">' + ICON.spark + "重新摘要</button>" +
-    '<button class="btn soft sm" data-act="lec-edit">' + ICON.edit + "編輯資料</button>" +
-    '<button class="btn soft sm" data-act="lec-retrans">重新轉逐字稿</button>' +
-    '<button class="btn ghost sm" data-act="lec-del" style="color:var(--danger)">' + ICON.trash + "刪除</button></div>" +
-    '<div class="tiny muted">換了模型或補了術語，可以「重新摘要」；辨識錯字很多，補術語後「重新轉逐字稿」。</div></section>';
 }
 function lectureEditSheet(l){
   openSheet('<h2>編輯影片資料</h2>' +
