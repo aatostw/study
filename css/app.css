@@ -658,3 +658,9 @@ h1,h2{color:var(--primary-text)}
 .book-hero .bh-foot{margin-top:8px;gap:10px}
 .book-hero .bh-foot .chip{background:rgba(255,255,255,.18);color:#fff;border:0}
 .book-hero .bh-head{align-items:flex-start;gap:10px}
+
+/* 記事本：直接在頁面上編輯 */
+.note-edit{gap:10px}
+.ne-title{border:0;border-bottom:1px solid var(--line);background:none;outline:0;font:inherit;font-size:22px;font-weight:800;color:var(--primary-text);padding:4px 0 10px;width:100%}
+.ne-body{border:0;background:var(--field);border-radius:12px;outline:0;font:inherit;font-size:16px;line-height:1.75;color:var(--ink);padding:12px;width:100%;resize:none;min-height:240px}
+.ne-body:focus,.ne-title:focus{box-shadow:0 0 0 2px var(--primary) inset}

@@ -178,7 +178,9 @@ const ACT = {
     if (el.dataset.p === "ai") S.aiCustom = false;
   },
   "pref-back": () => { S.prefPage = null; render.last = null; render(); $("#main").scrollTop = 0; },
-  "back": () => { closeSheet(); if (S.sub && S.sub.type === "eval") return go(S.view, {type: "book", id: S.sub.id}); go(S.view); },
+  "back": async () => {
+    if (S.noteEdit && S.noteDraft && !(await confirmBox("還沒儲存", "離開的話，這次的修改會不見。", "不儲存，離開", true))) return;
+    S.noteEdit = null; S.noteDraft = null; closeSheet(); if (S.sub && S.sub.type === "eval") return go(S.view, {type: "book", id: S.sub.id}); go(S.view); },
   "go": el => { closeSheet(); go(el.dataset.v); },
   "assist": el => { S.assist = el.dataset.v || null; render.last = null; render(); $("#main").scrollTop = 0; if (!S.books) loadBooks(); },
   "ask-focus": () => { const q = $("#chat-in"); if (q) q.focus(); },
@@ -322,12 +324,13 @@ const ACT = {
   },
   "open-note": el => { closeSheet(); S.note = null; go(S.view === "notebook" ? "notebook" : "books", {type: "note", id: Number(el.dataset.id)}); },
   "free-new": () => freeNoteSheet({}),
-  "free-edit": () => freeNoteSheet(S.note),
+  "free-edit": () => { S.noteEdit = S.note.id; S.noteDraft = null; render(); setTimeout(() => { const t = $("#f-content"); if (t){ growTA(t); t.focus(); } }, 50); },
+  "free-cancel": () => { S.noteEdit = null; S.noteDraft = null; render(); },
   "free-save": el => {
     const body = {title: $("#f-title").value.trim(), content: $("#f-content").value};
     if (!body.title && !body.content.trim()) return toast("標題和內容至少填一個");
     act("free", async () => {
-      if (el.dataset.id){ await api("/notes/" + el.dataset.id, {method: "PATCH", json: body}); closeSheet(); S.notes = null; await loadNote(); }
+      if (el.dataset.id){ await api("/notes/" + el.dataset.id, {method: "PATCH", json: body}); closeSheet(); S.notes = null; S.noteEdit = null; S.noteDraft = null; await loadNote(); }
       else { const r = await api("/notes", {json: body}); closeSheet(); S.notes = null; go(S.view === "notebook" ? "notebook" : "books", {type: "note", id: r.note.id}); }
       toast("存好了");
     });
@@ -650,7 +653,12 @@ document.addEventListener("change", async e => {
     S.busy.ocr = false; render();
   }
 });
+function growTA(t){ t.style.height = "auto"; t.style.height = t.scrollHeight + 2 + "px"; }
 document.addEventListener("input", e => {
+  if ((e.target.id === "f-content" || e.target.id === "f-title") && S.noteEdit && $(".note-edit")){
+    S.noteDraft = {title: $("#f-title").value, content: $("#f-content").value};
+    if (e.target.id === "f-content") growTA(e.target);
+  }
   if (e.target.id === "pop-in"){ const q = e.target; q.style.height = "auto"; q.style.height = Math.min(q.scrollHeight, 120) + "px"; }
 });
 document.addEventListener("keydown", e => {
@@ -666,6 +674,7 @@ const AU = $("#au");
 ["timeupdate", "play", "pause", "loadedmetadata"].forEach(ev => AU.addEventListener(ev, () => playerTick()));
 function afterRender(){
   playerTick();
+  const ta = $(".inline-ta"); if (ta) growTA(ta);
   syncAskBtn();
   syncVideo();
   loadThumbs();

@@ -172,6 +172,15 @@ function renderNotebook(){
 function renderNote(){
   if (!S.note || S.note.id !== S.sub.id) return pageTop("記事本") + loading();
   const n = S.note;
+  if (S.noteEdit === n.id){
+    const d = S.noteDraft || {title: n.title || "", content: n.content || ""};
+    return pageTop("記事本", '<button class="btn soft sm" data-act="free-cancel">取消</button>' +
+        '<button class="btn sm" data-act="free-save" data-id="' + n.id + '">' + (S.busy.free ? '<span class="spinner"></span>' : "") + "儲存</button>") +
+      '<section class="card note-edit"><input class="ne-title" id="f-title" value="' + esc(d.title) + '" placeholder="標題">' +
+      '<div class="tiny muted">' + fmtDate(n.updated_at) + " · 編輯中</div>" +
+      '<textarea class="ne-body inline-ta" id="f-content" placeholder="想法、摘錄、要朗讀的文章…">' + esc(d.content) + "</textarea></section>";
+  }
+  if (S.noteEdit) S.noteEdit = null;
   return pageTop("記事本", '<button class="btn soft sm" data-act="read-note">' + ICON.speaker + "朗讀</button>" +
       '<button class="btn soft sm" data-act="free-edit">' + ICON.edit + "編輯</button>" +
       '<button class="btn soft sm" data-act="free-del" style="color:var(--danger)">' + ICON.trash + "刪除</button>") +
