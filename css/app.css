@@ -694,3 +694,5 @@ h1,h2{color:var(--primary-text)}
 .chip.lchip.lt-green{color:var(--lt-green)}.chip.lchip.lt-yellow{color:#B88400}.chip.lchip.lt-red{color:var(--lt-red)}.chip.lchip.lt-unknown{color:var(--lt-unknown)}
 .lic-inline{display:inline-block;vertical-align:-3px;margin-right:3px}
 .lic-inline .lic{width:15px;height:15px}
+.list-row .ic.lic-box,.list-row .ic.lic-box.lt-green,.list-row .ic.lic-box.lt-yellow,.list-row .ic.lic-box.lt-red,.list-row .ic.lic-box.lt-unknown{background:none;width:30px;margin-right:-2px}
+.list-row .ic.lic-box .lic{width:30px;height:30px}
