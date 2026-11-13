@@ -88,8 +88,8 @@ function cmpMenu(){
   openSheet('<div class="row" style="gap:10px"><h2 style="margin:0">回答方式</h2>' +
     (n ? '<button class="part-chip" data-act="pin-sheet" title="' + esc(S.chatPins.map(p => p.label).join("、")) + '">📌 部分引用（' + n + " 項）</button>" : "") + "</div>" +
     '<div class="tile-row">' + tile("menu-kb", o.kb || n, n ? "只看指定" : "引用書櫃", n) + tile("menu-web", o.web, "網路搜尋") + "</div>" +
-    '<button class="menu-sw" data-act="pin-sheet"><span><b>⚙️ 進階</b><span class="small muted">比重（' + {kb: "書櫃為主", even: "平衡", web: "網路為主"}[o.balance] + "）・指定資料" + (n ? "（" + n + " 項）" : "") + '</span></span><span class="chev">›</span></button>' +
-    (!o.kb && !o.web && !n ? '<div class="small muted">兩個都關：直接跟 AI 聊，不查資料。</div>' : ""));
+    '<button class="menu-sw" data-act="pin-sheet"><span><b>⚙️ 進階</b></span><span class="chev">›</span></button>' +
+    "");
 }
 
 function msgHTML(m){
@@ -274,9 +274,9 @@ function advSheetBody(){
   return '<h2 style="margin:0">進階</h2>' +
     '<div class="label">比重</div><div class="bal-seg" role="group" aria-label="比重">' + [["kb", "書櫃為主"], ["even", "平衡"], ["web", "網路為主"]].map(x =>
       '<button data-act="chat-balance" data-v="' + x[0] + '" aria-pressed="' + (o.balance === x[0]) + '">' + x[1] + "</button>").join("") + "</div>" +
-    '<div class="tiny muted">同時開「網路搜尋」和書櫃（或指定）時才有作用。</div>' +
+
     '<div class="row between" style="margin-top:6px"><div class="label">指定資料</div><span class="tiny muted" id="pin-count">已選 ' + u.sel.size + " 項</span></div>" +
-    '<div class="tiny muted">勾選後，助理只在這些裡面找書櫃資料。只跟著這段對話。</div>' +
+
     '<div class="row"><input class="input grow" id="pin-q" placeholder="搜尋書名、作者、課程…" value="' + esc(u.q) + '">' +
     '<button class="btn soft sm" data-act="pin-all">全選</button><button class="btn ghost sm" data-act="pin-clear">清除</button></div>' +
     '<div id="pin-list" class="stack">' + (!S.books || !S.notes || !S.lectures ? '<div class="row muted"><span class="spinner"></span>載入中…</div>' : pinListHTML()) + "</div>" +
