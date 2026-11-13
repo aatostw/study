@@ -49,11 +49,24 @@ function evalSection(b, live){
   }
   const L0 = LIGHT[ev.credibility.light] || LIGHT.unknown, V0 = VERDICT[ev.verdict.level] || VERDICT.skim;
   html += '<button class="list-row evalcard" data-act="eval-toggle"><span class="ic yellow">' + L0[2] + '</span><span class="t"><b>' + V0[0] + " · " + L0[0] +
-    '</b><span class="sub">' + esc(ev.credibility.headline || ev.reception.headline || "") + '</span></span><span class="chev">' + (S.evalOpen ? "▾" : "›") + "</span></button>";
-  if (!S.evalOpen) return html + "</section>";
-  html += '<div class="row wrap"><button class="btn soft sm" data-act="evaluate" data-id="' + b.id + '"' + (running ? " disabled" : "") + ">" + ICON.spark + "重新評估</button>" +
-    '<button class="btn soft sm" data-act="evid-open">補充資料' + (b.user_evidence ? "（有）" : "") + "</button></div></section>";
-  return html + evalDetail(b, ev);
+    '</b><span class="sub">' + esc(ev.credibility.headline || ev.reception.headline || "") + '</span></span><span class="chev">›</span></button>';
+  return html + "</section>";
+}
+
+/* 評估的專屬頁 */
+function renderEval(){
+  const backB = '<button class="back-btn" data-act="back" aria-label="回這本書">' + ICON.back + "</button>";
+  if (!S.book || S.book.book.id !== S.sub.id) return '<div class="page-top">' + backB + "</div>" + loading();
+  const b = S.book.book, ev = b.evaluation;
+  const live = (S.jobs || []).find(j => j.ref_id === b.id && j.kind === "evaluate" && j.status !== "done");
+  const running = live && (live.status === "queued" || live.status === "running");
+  let html = '<div class="page-top">' + backB + '<div class="pt-title"><b>網路評價</b><span>《' + esc(b.title) + "》</span></div></div>";
+  if (live) html += jobCard(live);
+  if (!ev) return html + evalSection(b, live);
+  html += evalDetail(b, ev);
+  html += '<div class="row wrap"><button class="btn soft" data-act="evaluate" data-id="' + b.id + '"' + (running ? " disabled" : "") + ">" + ICON.spark + "重新評估</button>" +
+    '<button class="btn soft" data-act="evid-open">補充資料' + (b.user_evidence ? "（有）" : "") + "</button></div>";
+  return html;
 }
 
 function evalDetail(b, ev){

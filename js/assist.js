@@ -299,7 +299,7 @@ async function pinSheet(){
 function popTarget(){
   const sub = S.sub;
   if (!sub) return null;
-  if (sub.type === "book" && S.book && S.book.book.id === sub.id) return {kind: "book", id: sub.id, label: S.book.book.title};
+  if ((sub.type === "book" || sub.type === "eval") && S.book && S.book.book.id === sub.id) return {kind: "book", id: sub.id, label: S.book.book.title};
   if (sub.type === "note" && S.note && S.note.id === sub.id) return {kind: "note", id: sub.id, label: S.note.title || "筆記"};
   if (sub.type === "lecture" && S.lecture && S.lecture.lecture.id === sub.id) return {kind: "lecture", id: sub.id, label: S.lecture.lecture.title};
   return null;

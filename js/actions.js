@@ -178,7 +178,7 @@ const ACT = {
     if (el.dataset.p === "ai") S.aiCustom = false;
   },
   "pref-back": () => { S.prefPage = null; render.last = null; render(); $("#main").scrollTop = 0; },
-  "back": () => { closeSheet(); go(S.view); },
+  "back": () => { closeSheet(); if (S.sub && S.sub.type === "eval") return go(S.view, {type: "book", id: S.sub.id}); go(S.view); },
   "go": el => { closeSheet(); go(el.dataset.v); },
   "assist": el => { S.assist = el.dataset.v || null; render.last = null; render(); $("#main").scrollTop = 0; if (!S.books) loadBooks(); },
   "ask-focus": () => { const q = $("#chat-in"); if (q) q.focus(); },
@@ -385,7 +385,8 @@ const ACT = {
       go(S.view === "mybooks" ? "mybooks" : "books", {type: "book", id: r.book.id});
     });
   },
-  "eval-toggle": () => { S.evalOpen = !S.evalOpen; render(); },
+  "eval-toggle": () => { closeSheet(); go(S.view, {type: "eval", id: S.book.book.id}); $("#main").scrollTop = 0; },
+  "ntab": el => { S.ntab = el.dataset.v; render(); },
   "shelf-set": el => act("books", async () => {
     await api("/books/" + S.sub.id, {method: "PATCH", json: {shelf: el.dataset.v}});
     S.book.book.shelf = el.dataset.v; S.books = null; render(); toast("改成「" + SHELF[el.dataset.v] + "」");
@@ -408,7 +409,7 @@ const ACT = {
   "esrc": el => evalSourceSheet(el.dataset.n),
   "pick-book": el => { S.bookTarget = el.dataset.id ? Number(el.dataset.id) : 0; $("#pick-book").value = ""; $("#pick-book").click(); },
   "pick-photo": () => { $("#pick-photo").value = ""; $("#pick-photo").click(); },
-  "note-new": () => noteSheet({}),
+  "note-new": () => noteSheet(S.ntab && S.ntab !== "ai" && S.ntab !== "未分章" && S.sub && S.sub.type === "book" ? {chapter: S.ntab} : {}),
   "note-edit": el => noteSheet(S.book.notes.find(n => String(n.id) === el.dataset.id) || {}),
   "note-save": el => {
     const body = {quote: $("#n-quote").value, content: $("#n-content").value, chapter: $("#n-chapter").value, page: $("#n-page").value, source: el.dataset.source};
@@ -665,7 +666,7 @@ function fromHash(){
   const m = location.hash.slice(1).split("/");
   const views = ["books", "mybooks", "notebook", "lectures", "review", "ask", "prefs"];
   S.view = views.includes(m[0]) ? m[0] : "books";
-  S.sub = ["book", "lecture", "note"].includes(m[1]) && Number(m[2]) ? {type: m[1], id: Number(m[2])} : null;
+  S.sub = ["book", "lecture", "note", "eval"].includes(m[1]) && Number(m[2]) ? {type: m[1], id: Number(m[2])} : null;
 }
 document.addEventListener("toggle", e => { if (e.target.dataset && e.target.dataset.actToggle === "ai-adv") S.aiAdv = e.target.open; }, true);
 window.addEventListener("popstate", () => { closeSheet(); fromHash(); render.last = null; render(); load(); });

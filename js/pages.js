@@ -6,7 +6,7 @@
 /* ---------- 載入資料 ---------- */
 async function load(){
   try {
-    if (S.sub && S.sub.type === "book") return await loadBook();
+    if (S.sub && (S.sub.type === "book" || S.sub.type === "eval")) return await loadBook();
     if (!S.settings) loadSettings().catch(() => {});        // 朗讀要用到語言和速度
     if (S.sub && S.sub.type === "lecture") return await loadLecture();
     if (S.sub && S.sub.type === "note") return await loadNote();
@@ -96,10 +96,35 @@ function renderBook(){
   if (S.busy.ocr) html += '<div class="note"><div class="row"><span class="spinner"></span>正在辨識照片裡的文字…</div></div>';
   if (live && live.status !== "done") html += jobCard(live);
   html += evalSection(b, evLive && evLive.status !== "done" ? evLive : null);
-  if (b.analysis) html += analysisHTML(b.analysis);
-  html += '<section class="card"><div class="label">筆記</div>' + (notes.length ? '<div class="stack">' + notes.map(noteHTML).join("") + "</div>"
-    : '<div class="empty">還沒有筆記。打字、貼上，或拍下畫線的那一頁。</div>') + "</section>";
+  html += notesSection(b, notes);
   return html;
+}
+/* 筆記區：AI 分析 | 第一章 | 第二章 | ＋新增筆記 */
+function noteChapters(notes){
+  const order = [];
+  notes.slice().reverse().forEach(n => { const c = (n.chapter || "").trim() || "未分章"; if (!order.includes(c)) order.push(c); });
+  const num = c => { const m = /第?\s*([0-9０-９一二三四五六七八九十百零〇兩]+)\s*[章篇部卷回節講]/.exec(c); if (!m) return 1e9; const d = m[1].replace(/[０-９]/g, x => String.fromCharCode(x.charCodeAt(0) - 65248));
+    if (/^\d+$/.test(d)) return Number(d); const D = {零: 0, 〇: 0, 一: 1, 二: 2, 兩: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9}; let t = 0, cur = 0;
+    for (const ch of d){ if (ch in D) cur = D[ch]; else if (ch === "十"){ t += (cur || 1) * 10; cur = 0; } else if (ch === "百"){ t += (cur || 1) * 100; cur = 0; } } return t + cur; };
+  return order.map((c, i) => [c, i]).sort((a, b) => (a[0] === "未分章") - (b[0] === "未分章") || num(a[0]) - num(b[0]) || a[1] - b[1]).map(x => x[0]);
+}
+function notesSection(b, notes){
+  const chs = noteChapters(notes);
+  const tabs = ["ai"].concat(chs);
+  if (!S.ntab || S.ntabBook !== b.id || !tabs.includes(S.ntab)){ S.ntab = b.analysis || !chs.length ? "ai" : chs[0]; S.ntabBook = b.id; }
+  let html = '<section class="card notes-box"><div class="ntabs-row"><div class="ntabs" role="tablist">' +
+    tabs.map(t => '<button role="tab" data-act="ntab" data-v="' + esc(t) + '" aria-pressed="' + (S.ntab === t) + '">' + (t === "ai" ? "AI 分析" : esc(t)) + "</button>").join("") + "</div>" +
+    '<button class="hbtn" data-act="note-new"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8" stroke-linecap="round"/></svg>新增筆記</button></div>';
+  if (S.ntab === "ai"){
+    html += b.analysis ? analysisHTML(b.analysis)
+      : '<div class="empty">' + (notes.length ? "還沒有 AI 分析。按「分析筆記」，AI 會整理這本書筆記的重點、跟其他書的關聯和值得再想的問題。" : "先記幾則筆記，再讓 AI 分析。") + "</div>" +
+        (notes.length ? '<button class="btn soft block" data-act="analyze" data-id="' + b.id + '">' + ICON.spark + "分析筆記</button>" : "");
+  } else {
+    const list = notes.filter(n => ((n.chapter || "").trim() || "未分章") === S.ntab);
+    html += '<div class="stack">' + list.map(noteHTML).join("") + "</div>";
+  }
+  if (!notes.length && S.ntab === "ai") html += '<div class="tiny muted">打字、貼上，或拍下畫線的那一頁。</div>';
+  return html + "</section>";
 }
 function noteHTML(n){
   const where = [n.chapter, n.page ? "p." + n.page : ""].filter(Boolean).join(" · ");
@@ -110,14 +135,14 @@ function noteHTML(n){
     '<div class="acts"><button class="btn ghost sm" data-act="note-edit" data-id="' + n.id + '">' + ICON.edit + '編輯</button><button class="btn ghost sm" data-act="note-del" data-id="' + n.id + '">' + ICON.trash + "刪除</button></div></div>";
 }
 function analysisHTML(a){
-  let html = '<section class="card" data-read="AI 分析"><div class="row between no-read"><div class="label">AI 分析（你的筆記）</div>' + readBtn() + "</div>";
+  let html = '<div class="stack ai-an" data-read="AI 分析"><div class="row between no-read"><span class="tiny muted">根據你的筆記整理</span>' + readBtn() + "</div>";
   if (a.summary) html += '<p style="margin:0;line-height:1.75">' + esc(a.summary) + "</p>";
   if ((a.themes || []).length) html += '<div class="stack">' + a.themes.map(t => '<div class="sec"><h3>' + esc(t.title) + '</h3><div class="small" style="line-height:1.7">' + esc(t.explain || "") + "</div></div>").join("") + "</div>";
   if ((a.connections || []).length){
     html += '<div class="label">跟其他書和影片的關聯</div><div class="stack">' + a.connections.map(c => '<div class="pt"><span class="chip green" style="flex:none">' + esc(c.theme || "") + '</span><span class="rich">' + richHTML(c.text, "analysis") + "</span></div>").join("") + "</div>";
   }
   if ((a.questions || []).length) html += '<div class="label">值得再想的問題</div><ol style="margin:0;padding-left:22px;line-height:1.8">' + a.questions.map(q => "<li>" + esc(q) + "</li>").join("") + "</ol>";
-  return html + '<div class="tiny muted">' + esc(a.at || "") + "</div></section>";
+  return html + '<div class="tiny muted">' + esc(a.at || "") + "</div></div>";
 }
 function noteSheet(n){
   const isNew = !n.id;
