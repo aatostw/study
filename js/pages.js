@@ -73,33 +73,31 @@ function jobCard(job){
     progressBar(job.progress) + '<div class="small muted">' + esc(job.step || "等前面的工作做完") + "</div></div>";
 }
 
+const CHAT_IC = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-9l-5 4v-4H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" fill="#4C8DF6"/><circle cx="8.5" cy="11" r="1.3" fill="#fff"/><circle cx="12" cy="11" r="1.3" fill="#fff"/><circle cx="15.5" cy="11" r="1.3" fill="#fff"/></svg>';
 function renderBook(){
-  const back = '<button class="btn ghost back" data-act="back">' + ICON.back + ({ask: "助理", mybooks: "我的書"}[S.view] || "書櫃") + "</button>";
-  if (!S.book || S.book.book.id !== S.sub.id) return back + loading();
+  const backB = '<button class="back-btn" data-act="back" aria-label="回' + ({ask: "助理", mybooks: "我的書"}[S.view] || "書櫃") + '">' + ICON.back + "</button>";
+  if (!S.book || S.book.book.id !== S.sub.id) return '<div class="page-top">' + backB + "</div>" + loading();
   const {book: b, notes, job} = S.book;
   const jobs = S.jobs || [];
   const live = jobs.find(j => j.ref_id === b.id && (j.kind === "bookfile" || j.kind === "analyze") && j.status !== "done") || (job && job.kind !== "evaluate" ? job : null);
   const evLive = jobs.find(j => j.ref_id === b.id && j.kind === "evaluate" && j.status !== "done") || (job && job.kind === "evaluate" ? job : null);
   const sh = b.shelf || "reading";
-  let html = back + '<section class="card hero"><div class="row between"><div class="seg shelf-seg" role="group" aria-label="狀態">' +
+  let html = '<div class="page-top">' + backB + '<span class="grow"></span>' +
+    '<button class="btn soft sm" data-act="ask-pin" data-kind="book" data-id="' + b.id + '" data-label="' + esc(b.title) + '"><span class="chat-ic">' + CHAT_IC + "</span>問助理</button>" +
+    '<button class="btn soft sm" data-act="book-edit">' + ICON.edit + "編輯</button></div>" +
+    '<section class="card hero"><div class="row between"><div class="seg shelf-seg" role="group" aria-label="狀態">' +
     ["wish", "reading", "done"].map(v => '<button data-act="shelf-set" data-v="' + v + '" aria-pressed="' + (sh === v) + '">' + SHELF[v] + "</button>").join("") + "</div>" +
     starBtn("book", b.id, b.starred) + "</div>" +
     '<div class="hero-book"><button class="hero-cover" data-act="cover-sheet" aria-label="換封面">' + coverHTML(b) + '<span class="hc-edit">換封面</span></button>' +
     "<div><h1>" + esc(b.title) + "</h1>" + (b.author ? '<div class="sub">' + esc(b.author) + "</div>" : "") + "</div></div>" +
-    '<div class="row wrap"><span class="chip">' + notes.length + " 則筆記</span>" +
-    (b.file_name ? '<span class="chip">原文：' + esc(b.file_name) + "</span>" : "") + (b.isbn ? '<span class="chip en">ISBN ' + esc(b.isbn) + "</span>" : "") + "</div></section>";
-  html += '<div class="row wrap"><button class="btn grow" data-act="note-new">' + ICON.plus + "記一則筆記</button>" +
-    '<button class="btn soft" data-act="pick-photo">' + ICON.camera + "拍照</button></div>";
-  html += '<div class="row wrap"><button class="btn soft sm" data-act="pick-book" data-id="' + b.id + '">' + ICON.upload + (b.file_name ? "換原文檔" : "上傳原文 PDF／EPUB") + "</button>" +
-    '<button class="btn soft sm" data-act="analyze" data-id="' + b.id + '">' + ICON.spark + (b.analysis ? "重新分析筆記" : "AI 分析筆記") + "</button>" +
-    '<button class="btn soft sm" data-act="book-export" data-id="' + b.id + '">' + ICON.down + "匯出</button>" +
-    '<button class="btn ghost sm" data-act="book-edit">編輯</button></div>';
+    '<div class="row wrap"><span class="chip">' + notes.length + " 則筆記</span></div></section>";
+  html += '<div class="row"><button class="btn grow" data-act="note-new">' + ICON.plus + "記一則筆記</button>" +
+    '<button class="btn soft" data-act="analyze" data-id="' + b.id + '">' + ICON.spark + "分析筆記</button></div>";
   html += uploadsHTML("book");
   if (S.busy.ocr) html += '<div class="note"><div class="row"><span class="spinner"></span>正在辨識照片裡的文字…</div></div>';
   if (live && live.status !== "done") html += jobCard(live);
   html += evalSection(b, evLive && evLive.status !== "done" ? evLive : null);
   if (b.analysis) html += analysisHTML(b.analysis);
-  html += '<button class="btn soft block" data-act="ask-pin" data-kind="book" data-id="' + b.id + '" data-label="' + esc(b.title) + '">💬 問這本書（到助理，只看這本）</button>';
   html += '<section class="card"><div class="label">筆記</div>' + (notes.length ? '<div class="stack">' + notes.map(noteHTML).join("") + "</div>"
     : '<div class="empty">還沒有筆記。打字、貼上，或拍下畫線的那一頁。</div>') + "</section>";
   return html;
@@ -125,6 +123,7 @@ function analysisHTML(a){
 function noteSheet(n){
   const isNew = !n.id;
   openSheet('<h2>' + (isNew ? "記一則筆記" : "編輯筆記") + "</h2>" +
+    (isNew ? '<button class="btn soft block" data-act="pick-photo">' + ICON.camera + "拍下畫線的那一頁（自動辨識文字）</button>" : "") +
     '<div class="field"><label for="n-quote">原文摘句</label><textarea class="input" id="n-quote" rows="4" placeholder="書裡的那段話">' + esc(n.quote || "") + "</textarea></div>" +
     '<div class="field"><label for="n-content">我的想法</label><textarea class="input" id="n-content" rows="4" placeholder="為什麼畫這段、讓你想到什麼">' + esc(n.content || "") + "</textarea></div>" +
     '<div class="row"><div class="field grow"><label for="n-chapter">章節</label><input class="input" id="n-chapter" value="' + esc(n.chapter || "") + '" placeholder="第三章"></div>' +

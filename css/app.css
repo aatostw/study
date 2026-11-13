@@ -582,3 +582,9 @@ h1,h2{color:var(--primary-text)}
 #appsw .appsw-go{font-size:20px;color:var(--muted,#64748b)}
 #brand[hidden]{display:none}
 .pill[hidden]{display:none}
+
+/* 書頁上方（Figma 07） */
+.page-top{display:flex;align-items:center;gap:8px}
+.page-top .back-btn svg{width:20px;height:20px}
+.page-top .btn.sm{gap:6px}
+.chat-ic svg{width:18px;height:18px;display:block}
