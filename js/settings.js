@@ -126,7 +126,7 @@ function aiPage(){
       const opts = [["", "跟上面一樣（" + (d.model || "未選") + "）"]].concat(withKey.flatMap(q => (MODEL_PRESETS[q] || []).map(x => [q + "|" + x.id, P[q] + " · " + x.id, x.paid ? PAID : ""])));
       const cur = same ? "" : m.provider + "|" + m.model;
       if (cur && !opts.some(o => o[0] === cur)) opts.push([cur, (P[m.provider] || m.provider) + " · " + m.model, isPaid(m.provider, m.model) ? PAID : ""]);
-      return '<div class="field"><label class="small" for="tk-' + t + '"><b>' + esc(a.tasks[t].label) + '</b>　<span class="muted" style="font-weight:400">' + esc(a.tasks[t].hint) + "</span></label>" + dd("tk-" + t, a.tasks[t].label, opts, cur) + "</div>";
+      return '<div class="field"><label class="small" for="tk-' + t + '"><b>' + esc(a.tasks[t].label) + '</b></label>' + dd("tk-" + t, a.tasks[t].label, opts, cur) + "</div>";
     }).join("") + "</div></details></section>";
   return html;
 }
