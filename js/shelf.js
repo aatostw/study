@@ -31,11 +31,11 @@ function bookRow(b, i){
   if (b.analyzed) bits.push("已分析");
   const busy = b.eval_status === "queued" || b.eval_status === "running";
   if (busy) bits.unshift("評估中…");
-  else if (b.verdict && VERDICT[b.verdict]) bits.unshift((LIGHT[b.light] ? LIGHT[b.light][2] + " " : "") + VERDICT[b.verdict][0]);
+  else if (b.verdict && VERDICT[b.verdict]) bits.unshift((LIGHT[b.light] ? '<span class="lic-inline ' + LIGHT[b.light][1] + '">' + LIGHT[b.light][2] + "</span>" : "") + VERDICT[b.verdict][0]);
   const sh = b.shelf || "reading";
   return '<button class="list-row" data-act="open-book" data-id="' + b.id + '"><span class="ic ' + COLS[i % 3] + '">' + esc((b.title || "?").slice(0, 1)) + '</span><span class="t"><b>' + (b.starred ? "★ " : "") + esc(b.title) +
     '</b><span class="sub">' + esc(b.author ? b.author + " · " : "") + bits.join(" · ") + "</span></span>" +
-    (sh !== "reading" ? '<span class="chip ' + (sh === "wish" ? "yellow" : "green") + '">' + SHELF[sh] + "</span>" : '<span class="chev">›</span>') + "</button>";
+    '<span class="st-txt st-' + sh + '">' + SHELF[sh] + "</span></button>";
 }
 function noteRow(n){
   return '<button class="list-row" data-act="open-note" data-id="' + n.id + '"><span class="ic yellow">' + ICON.edit.replace("<svg", '<svg width="20" height="20"') + '</span><span class="t"><b>' + (n.starred ? "★ " : "") + esc(n.title || "（無標題）") +
@@ -93,7 +93,7 @@ function shelfGridHTML(){
     const list = starFirst(S.books.filter(shelfMatch));
     if (!list.length) return '<div class="empty">' + (S.shelfQ ? "找不到符合的書" : "還沒有書。按右上角「新增」。") + "</div>";
     return '<div class="grid3">' + list.map(b => '<button class="gcard" data-act="' + (act || "open-book") + '" data-k="book:' + b.id + '" data-id="' + b.id + '">' + coverHTML(b) +
-      (b.starred ? '<span class="gstar">★</span>' : "") + (b.shelf !== "reading" ? '<span class="gbadge ' + b.shelf + '">' + SHELF[b.shelf] + "</span>" : "") + selBox("book:" + b.id) +
+      (b.starred ? '<span class="gstar">★</span>' : "") + '<span class="gbadge ' + (b.shelf || "reading") + '">' + SHELF[b.shelf || "reading"] + "</span>" + selBox("book:" + b.id) +
       '<span class="gt">' + esc(b.title) + "</span></button>").join("") + "</div>";
   }
   if (tab === "note"){

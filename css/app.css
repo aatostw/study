@@ -665,3 +665,32 @@ h1,h2{color:var(--primary-text)}
 .ne-body{border:0;background:var(--field);border-radius:12px;outline:0;font:inherit;font-size:16px;line-height:1.75;color:var(--ink);padding:12px;width:100%;resize:none;min-height:240px}
 .ne-body:focus,.ne-title:focus{box-shadow:0 0 0 2px var(--primary) inset}
 .ne-body{field-sizing:content;overflow:hidden}
+
+/* 狀態色：想讀＝綠、在讀＝黃、讀完＝紅（只改字色） */
+:root{--st-wish:#2E9E6B;--st-reading:#C08A00;--st-done:#D9453B;--lt-green:#2E9E6B;--lt-yellow:#E0A100;--lt-red:#D9453B;--lt-unknown:#8A97A6}
+.gbadge.wish,.st-wish{color:var(--st-wish)}
+.gbadge.reading,.st-reading{color:var(--st-reading)}
+.gbadge.done,.st-done{color:var(--st-done)}
+.st-txt{flex:none;font-size:13px;font-weight:800;padding-left:6px}
+.hero .shelf-seg button[data-v="wish"][aria-pressed="true"]{color:var(--st-wish)}
+.hero .shelf-seg button[data-v="reading"][aria-pressed="true"]{color:var(--st-reading)}
+.hero .shelf-seg button[data-v="done"][aria-pressed="true"]{color:var(--st-done)}
+
+/* 可信度圖示：單色盾牌 */
+.lic{width:24px;height:24px;display:block}
+.lic.lt-green,.lt-green .lic{color:var(--lt-green)}
+.lic.lt-yellow,.lt-yellow .lic{color:var(--lt-yellow)}
+.lic.lt-red,.lt-red .lic{color:var(--lt-red)}
+.lic.lt-unknown,.lt-unknown .lic{color:var(--lt-unknown)}
+.list-row .ic.lic-box{background:#fff;box-shadow:inset 0 0 0 1.5px currentColor}
+.list-row .ic.lic-box.lt-green{color:var(--lt-green);background:#EAF6F0}
+.list-row .ic.lic-box.lt-yellow{color:var(--lt-yellow);background:#FDF5E0}
+.list-row .ic.lic-box.lt-red{color:var(--lt-red);background:#FCEBEA}
+.list-row .ic.lic-box.lt-unknown{color:var(--lt-unknown);background:#F0F2F5}
+.list-row .ic.lic-box{box-shadow:none}
+.list-row .ic.lic-box .lic{width:26px;height:26px}
+.chip.lchip{display:inline-flex;align-items:center;gap:5px;background:#fff;box-shadow:inset 0 0 0 1.5px currentColor;font-weight:800}
+.chip.lchip .lic{width:17px;height:17px}
+.chip.lchip.lt-green{color:var(--lt-green)}.chip.lchip.lt-yellow{color:#B88400}.chip.lchip.lt-red{color:var(--lt-red)}.chip.lchip.lt-unknown{color:var(--lt-unknown)}
+.lic-inline{display:inline-block;vertical-align:-3px;margin-right:3px}
+.lic-inline .lic{width:15px;height:15px}

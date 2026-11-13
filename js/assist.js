@@ -110,7 +110,7 @@ function evalCardHTML(bid){
   if (!b) return '<button class="list-row" data-act="open-book" data-id="' + bid + '"><span class="t"><b>看評估</b></span><span class="chev">›</span></button>';
   const busy = b.eval_status === "queued" || b.eval_status === "running";
   const L = LIGHT[b.light], V = VERDICT[b.verdict];
-  return '<button class="list-row evalcard" data-act="open-book" data-id="' + b.id + '"><span class="ic yellow">' + (busy ? '<span class="spinner" style="width:18px;height:18px"></span>' : L ? L[2] : "📖") + "</span>" +
+  return '<button class="list-row evalcard" data-act="open-book" data-id="' + b.id + '"><span class="ic lic-box ' + (L ? L[1] : "lt-unknown") + '">' + (busy ? '<span class="spinner" style="width:18px;height:18px"></span>' : L ? L[2] : lightIcon("unknown")) + "</span>" +
     '<span class="t"><b>' + esc(b.title) + '</b><span class="sub">' + (busy ? "評估中…" : b.eval_status === "error" ? "評估失敗，點進去重試" : esc(b.headline || "點開看評估")) + "</span></span>" +
     (V && !busy ? '<span class="chip ' + V[1] + '">' + V[0] + "</span>" : '<span class="chev">›</span>') + "</button>";
 }

@@ -4,7 +4,14 @@
    電腦上網找評價和作者資料，AI 寫成評估卡：
    可信度燈號（防唬爛）＋讀者心得＋適不適合你＋結論
    ========================================================= */
-const LIGHT = {green: ["可信", "green", "🟢"], yellow: ["留意", "yellow", "🟡"], red: ["警訊", "red", "🔴"], unknown: ["資料不足", "", "⚪"]};
+/* 可信度：單色盾牌圖示（打勾／驚嘆號／叉／問號） */
+const SHIELD = "M12 2.5 20 5.6v6.1c0 4.9-3.4 8.7-8 9.8-4.6-1.1-8-4.9-8-9.8V5.6z";
+const GLYPH = {green: '<path d="M8.4 12.2l2.5 2.5 4.8-5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
+  yellow: '<path d="M12 7.6v5.2" stroke="#fff" stroke-width="2.3" stroke-linecap="round"/><circle cx="12" cy="16" r="1.3" fill="#fff"/>',
+  red: '<path d="M9.3 9.3l5.4 5.4M14.7 9.3l-5.4 5.4" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>',
+  unknown: '<path d="M9.9 9.6a2.2 2.2 0 1 1 3 2.1c-.6.3-.9.7-.9 1.4v.4" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16.3" r="1.2" fill="#fff"/>'};
+function lightIcon(k){ k = GLYPH[k] ? k : "unknown"; return '<svg class="lic lt-' + k + '" viewBox="0 0 24 24" aria-hidden="true"><path d="' + SHIELD + '" fill="currentColor"/>' + GLYPH[k] + "</svg>"; }
+const LIGHT = {green: ["可信", "lt-green", lightIcon("green")], yellow: ["留意", "lt-yellow", lightIcon("yellow")], red: ["警訊", "lt-red", lightIcon("red")], unknown: ["資料不足", "lt-unknown", lightIcon("unknown")]};
 const VERDICT = {read: ["值得讀", "green"], skim: ["挑章節讀", "yellow"], skip: ["可以跳過", "red"]};
 
 function wishSheet(pre){
@@ -48,7 +55,7 @@ function evalSection(b, live){
     return html + "</section>";
   }
   const L0 = LIGHT[ev.credibility.light] || LIGHT.unknown, V0 = VERDICT[ev.verdict.level] || VERDICT.skim;
-  html += '<button class="list-row evalcard" data-act="eval-toggle"><span class="ic yellow">' + L0[2] + '</span><span class="t"><b>' + V0[0] + " · " + L0[0] +
+  html += '<button class="list-row evalcard" data-act="eval-toggle"><span class="ic lic-box ' + L0[1] + '">' + L0[2] + '</span><span class="t"><b>' + V0[0] + " · " + L0[0] +
     '</b><span class="sub">' + esc(ev.credibility.headline || ev.reception.headline || "") + '</span></span><span class="chev">›</span></button>';
   return html + "</section>";
 }
@@ -74,7 +81,7 @@ function evalDetail(b, ev){
     '<p style="margin:0;line-height:1.75">' + evalCite(ev.verdict.text) + "</p>" +
     (ev.book.summary ? '<div class="small muted">' + evalCite(ev.book.summary) + "</div>" : "") + "</section>";
 
-  html += '<section class="card"><div class="row between"><div class="label">可信度（防唬爛）</div><span class="chip ' + L[1] + '">' + L[2] + " " + L[0] + "</span></div>" +
+  html += '<section class="card"><div class="row between"><div class="label">可信度（防唬爛）</div><span class="chip lchip ' + L[1] + '">' + L[2] + L[0] + "</span></div>" +
     (ev.credibility.headline ? "<b>" + evalCite(ev.credibility.headline) + "</b>" : "") +
     (ev.credibility.author ? '<div class="pt"><span class="kind">作者</span><span>' + evalCite(ev.credibility.author) + "</span></div>" : "") +
     (ev.credibility.reasons.length ? '<ul class="ev-list">' + ev.credibility.reasons.map(x => "<li>" + evalItem(x) + "</li>").join("") + "</ul>" : "") + "</section>";
