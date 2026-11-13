@@ -13,7 +13,7 @@ import time
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response, StreamingResponse
 
-from . import ai, bookeval, chat, covers, review, config, db, engines, jobs, knowledge, tts, websearch
+from . import ai, bookeval, chat, covers, review, config, db, engines, jobs, knowledge, tts, video, websearch
 from .textutil import fmt_t, tts_parts
 
 app = FastAPI(title="study-server", docs_url=None, redoc_url=None, openapi_url=None)
@@ -594,26 +594,61 @@ async def inbox_import(request: Request):
 @app.get("/lectures")
 def lectures():
     rows = db.all("SELECT id, course, title, lang, duration, status, created_at, summary IS NOT NULL AS summarized, "
-                  "starred, summary->>'overview' AS overview FROM lectures ORDER BY created_at DESC")
+                  "starred, summary->>'overview' AS overview, youtube, thumb, video_path <> '' AS has_video FROM lectures ORDER BY created_at DESC")
     return {"ok": True, "lectures": rows}
 
 
 def _lec(lid):
     r = db.one("SELECT * FROM lectures WHERE id = %s", (lid,))
     if not r:
-        raise Bad("找不到這堂課", 404)
+        raise Bad("找不到這支影片", 404)
     return r
 
 
 @app.get("/lectures/{lid}")
 def lecture_get(lid: int):
     lec = _lec(lid)
-    for k in ("media_path", "audio_path"):
+    for k in ("media_path", "audio_path", "video_path"):
         lec[k] = bool(lec[k])
     segs = db.all("SELECT idx, t0, t1, text FROM segments WHERE lecture_id = %s ORDER BY idx", (lid,))
     job = db.one("SELECT id, kind, status, step, progress, error FROM jobs WHERE ref_id = %s AND kind IN ('lecture', 'resummarize') "
                  "ORDER BY id DESC LIMIT 1", (lid,))
     return {"ok": True, "lecture": lec, "segments": segs, "job": job}
+
+
+@app.post("/lectures/youtube")
+async def lecture_youtube(request: Request):
+    b = await body_json(request)
+    vid = video.yt_id(b.get("url") or "")
+    if not vid:
+        raise Bad("看不懂這個網址，請貼 YouTube 影片的網址（youtube.com/watch?v=… 或 youtu.be/…）")
+    meta = await asyncio.to_thread(video.yt_meta, vid)
+    if meta.get("error"):
+        raise Bad(meta["error"])
+    url = "https://www.youtube.com/watch?v=" + vid
+    lang = b.get("lang") if b.get("lang") in ("zh", "en", "auto") else (db.get_setting("prefs", {}) or {}).get("lang", "zh")
+    title = s(b.get("title"), 200) or meta.get("title") or "YouTube 影片"
+    course = s(b.get("course"), 200) or s(meta.get("author"), 200)
+    lec = db.one("INSERT INTO lectures (course, title, lang, terms, file_name, youtube) VALUES (%s, %s, %s, '', %s, %s) RETURNING id",
+                 (course, title, lang, url, url))
+    j = jobs.add("lecture", lec["id"], title)
+    return {"ok": True, "lecture_id": lec["id"], "job": j}
+
+
+@app.get("/lectures/{lid}/thumb")
+def lecture_thumb(lid: int):
+    p = video.thumb_path(lid)
+    if not os.path.isfile(p):
+        raise Bad("沒有縮圖", 404)
+    return Response(open(p, "rb").read(), media_type="image/jpeg", headers={"Cache-Control": "private, max-age=31536000"})
+
+
+@app.get("/lectures/{lid}/video")
+def lecture_video(lid: int, request: Request):
+    lec = _lec(lid)
+    if not lec["video_path"] or not os.path.isfile(lec["video_path"]):
+        raise Bad("影片還沒準備好", 404)
+    return _range_file(lec["video_path"], request, "video/mp4")
 
 
 @app.patch("/lectures/{lid}")
@@ -631,7 +666,7 @@ def lecture_del(lid: int):
     lec = _lec(lid)
     db.run("DELETE FROM lectures WHERE id = %s", (lid,))
     db.run("UPDATE jobs SET status = 'error', error = '已刪除' WHERE ref_id = %s AND kind IN ('lecture', 'resummarize') AND status = 'queued'", (lid,))
-    for p in (lec["media_path"], lec["audio_path"]):
+    for p in (lec["media_path"], lec["audio_path"], lec["video_path"], video.thumb_path(lid)):
         if p and os.path.isfile(p):
             try:
                 os.remove(p)
@@ -650,7 +685,7 @@ def lecture_resum(lid: int):
 @app.post("/lectures/{lid}/retranscribe")
 def lecture_retrans(lid: int):
     lec = _lec(lid)
-    if not os.path.isfile(lec["media_path"]):
+    if not lec["youtube"] and not os.path.isfile(lec["media_path"]):
         raise Bad("原始檔案已經不在了，不能重新轉逐字稿")
     db.run("DELETE FROM segments WHERE lecture_id = %s", (lid,))
     db.run("DELETE FROM chunks WHERE lecture_id = %s", (lid,))

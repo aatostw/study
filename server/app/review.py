@@ -76,7 +76,7 @@ def _gather(start, end):
                     "ORDER BY created_at", (start, end)):
         s = l["summary"] or {}
         secs = "；".join("%s：%s" % (x.get("title", ""), x.get("summary", "")) for x in s.get("sections") or [])
-        add("lecture", l["id"], "%s%s（課程）" % ((l["course"] + "｜") if l["course"] else "", l["title"]), (s.get("overview") or "") + " " + secs)
+        add("lecture", l["id"], "%s%s（影片）" % ((l["course"] + "｜") if l["course"] else "", l["title"]), (s.get("overview") or "") + " " + secs)
     for b in db.all("SELECT id, title, evaluation FROM books WHERE evaluation IS NOT NULL AND updated_at >= %s AND updated_at < %s", (start, end)):
         v = (b["evaluation"] or {}).get("verdict") or {}
         add("book", b["id"], "《%s》選書評估" % b["title"], v.get("text", ""))
@@ -128,7 +128,7 @@ def run(job, prog):
     start = dt.datetime.combine(r["week_start"], dt.time(0, 0)).astimezone()
     end = r["range_end"]
     label = "%d/%d～%d/%d" % (start.month, start.day, (end - dt.timedelta(seconds=1)).month, (end - dt.timedelta(seconds=1)).day)
-    prog("收集這週的筆記、書、課程", 0.1, True)
+    prog("收集這週的筆記、書、影片", 0.1, True)
     items = _gather(start, end)
     if not items:
         db.run("UPDATE reviews SET status = 'empty', content = %s, updated_at = now() WHERE id = %s",

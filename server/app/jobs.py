@@ -11,7 +11,7 @@ import os
 import time
 import traceback
 
-from . import ai, bookeval, config, covers, db, engines, knowledge, review
+from . import ai, bookeval, config, covers, db, engines, knowledge, review, video
 from .db import Jsonb
 from .textutil import chunk_text, epub_chapters, fmt_t, parse_t, pdf_pages, to_trad
 
@@ -75,11 +75,24 @@ def _mark_ref_error(job):
 def run_lecture(job, prog):
     lec = db.one("SELECT * FROM lectures WHERE id = %s", (job["ref_id"],))
     if not lec:
-        raise RuntimeError("這堂課已經被刪除")
+        raise RuntimeError("這支影片已經被刪除")
     db.run("UPDATE lectures SET status = 'processing' WHERE id = %s", (lec["id"],))
     base = os.path.join(config.MEDIA_DIR, "lecture-%d" % lec["id"])
     wav, m4a = base + ".16k.wav", base + ".m4a"
     have_segments = db.one("SELECT count(*) AS n FROM segments WHERE lecture_id = %s", (lec["id"],))["n"]
+
+    # 0. YouTube：交給 Gemini 看影片寫逐字稿（不下載影片）
+    if lec.get("youtube") and not have_segments:
+        segs = video.youtube_segments(lec, prog)
+        dur = segs[-1][1]
+        db.run("UPDATE lectures SET duration = %s WHERE id = %s", (dur, lec["id"]))
+        lec["duration"] = dur
+        with db.connect() as c:
+            c.execute("DELETE FROM segments WHERE lecture_id = %s", (lec["id"],))
+            with c.cursor() as cur:
+                cur.executemany("INSERT INTO segments (lecture_id, idx, t0, t1, text) VALUES (%s, %s, %s, %s, %s)",
+                                [(lec["id"], i, t0, t1, to_trad(t) if lec["lang"] != "en" else t) for i, (t0, t1, t) in enumerate(segs)])
+        have_segments = len(segs)
 
     # 1. 轉檔
     if not have_segments:
@@ -106,6 +119,12 @@ def run_lecture(job, prog):
             os.remove(wav)
         except OSError:
             pass
+        # 有畫面的話：縮圖、手機能播的版本
+        try:
+            with video._lock:
+                video.prepare_video(lec)
+        except Exception as e:
+            print("  [影片] %s" % e, flush=True)
 
     # 3. 建索引
     segments = db.all("SELECT idx, t0, t1, text FROM segments WHERE lecture_id = %s ORDER BY idx", (lec["id"],))
@@ -124,7 +143,7 @@ def run_lecture(job, prog):
 def run_resummarize(job, prog):
     lec = db.one("SELECT * FROM lectures WHERE id = %s", (job["ref_id"],))
     if not lec:
-        raise RuntimeError("這堂課已經被刪除")
+        raise RuntimeError("這支影片已經被刪除")
     segments = db.all("SELECT idx, t0, t1, text FROM segments WHERE lecture_id = %s ORDER BY idx", (lec["id"],))
     if not segments:
         return run_lecture(job, prog)

@@ -177,7 +177,7 @@ def main():
     say("  學習筆記：電腦端伺服器" + ("（測試模式）" if config.FAKE else ""))
     say(line)
     try:
-        from app import covers, db, engines, jobs, knowledge, review, tts
+        from app import covers, db, engines, jobs, knowledge, review, tts, video
         say("連接資料庫 …")
         check_db()
         db.init()
@@ -187,6 +187,7 @@ def main():
         threading.Thread(target=jobs.worker, daemon=True).start()
         threading.Thread(target=review.scheduler, daemon=True).start()
         threading.Thread(target=covers.backfill, daemon=True).start()
+        threading.Thread(target=video.backfill, daemon=True).start()
         threading.Thread(target=knowledge.notes_indexer, daemon=True).start()
         threading.Thread(target=engines.asr_idle_unloader, daemon=True).start()
         start_api()

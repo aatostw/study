@@ -42,7 +42,7 @@ const Up = {
     u.state = "finishing"; renderSoon();
     const r = await api("/uploads/" + u.id + "/finish", {method: "POST"});
     u.state = "done"; u.sent = u.size; u.result = r; u.file = null;
-    toast(u.kind === "lecture" ? "上傳完成，電腦開始處理這堂課" : "上傳完成，電腦開始讀這本書");
+    toast(u.kind === "lecture" ? "上傳完成，電腦開始處理這支影片" : "上傳完成，電腦開始讀這本書");
     pollJobs(true);
     if (u.kind === "book"){ S.books = null; if (S.sub && S.sub.type === "book") loadBook(); }
     if (u.kind === "lecture"){ S.lectures = null; loadLectures(); }

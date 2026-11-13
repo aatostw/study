@@ -40,7 +40,7 @@ function renderPrefs(){
     ["status", "電腦狀態", S.online === false ? "連不到電腦" : s ? "已連線・" + s.gpu + (s.queue.running ? "・處理中" : "") : "讀取中…"],
     ["ai", "AI 模型", aiSummary()],
     ["voice", "朗讀", "GPT-SoVITS・" + (TTS_LANG_LABEL[pr.tts_lang] || "中英混合") + "・" + Number(pr.tts_speed || 1).toFixed(1) + "×"],
-    ["lecture", "課程", "預設語言：" + (LANG_LABEL[pr.lang] || LANG_LABEL.zh) + (s ? "・Whisper " + s.asr_model : "")],
+    ["lecture", "影片", "預設語言：" + (LANG_LABEL[pr.lang] || LANG_LABEL.zh) + (s ? "・Whisper " + s.asr_model : "")],
     ["link", "連線", S.api.replace(/^https?:\/\//, "")]
   ];
   if (!S.prefPage){
@@ -76,7 +76,7 @@ function statusPage(){
     row("ffmpeg", s.ffmpeg ? stateChip("ready") : '<span class="chip red">找不到</span>') + "</div>" +
     '<div class="pref-group"><div class="pref-h">資料</div>' +
     row("工作佇列", (s.queue.running ? "處理中 " + s.queue.running : "閒置") + (s.queue.queued ? "，排隊 " + s.queue.queued : "")) +
-    row("內容", s.counts.books + " 本書・" + s.counts.notes + " 則筆記・" + s.counts.lectures + " 堂課") +
+    row("內容", s.counts.books + " 本書・" + s.counts.notes + " 則筆記・" + s.counts.lectures + " 支影片") +
     row("硬碟剩餘", s.disk_free_gb + " GB") + "</div>" +
     (s.asr_error ? '<div class="err">Whisper：' + esc(s.asr_error) + "</div>" : "") +
     (s.embed_error ? '<div class="err">向量模型：' + esc(s.embed_error) + "</div>" : "") +
@@ -156,9 +156,9 @@ function refHTML(){
 /* ---------- 課程 ---------- */
 function lecturePrefPage(){
   const pr = (S.settings && S.settings.prefs) || {}, s = S.status;
-  return '<section class="card pref-card"><h2 style="font-size:20px">課程</h2>' +
-    '<div class="pref-group"><div class="pref-h">上課語言（新增課程時的預設）</div><div class="seg">' + ["zh", "en", "auto"].map(v => '<button data-act="pref" data-k="lang" data-v="' + v + '" aria-pressed="' + ((pr.lang || "zh") === v) + '">' + LANG_LABEL[v] + "</button>").join("") + "</div>" +
-    '<div class="small muted">中英夾雜的課選「中文」，英文術語會照樣保留。辨識不準的話，在每堂課的資料裡補上術語。</div></div>' +
+  return '<section class="card pref-card"><h2 style="font-size:20px">影片</h2>' +
+    '<div class="pref-group"><div class="pref-h">影片語言（新增時的預設）</div><div class="seg">' + ["zh", "en", "auto"].map(v => '<button data-act="pref" data-k="lang" data-v="' + v + '" aria-pressed="' + ((pr.lang || "zh") === v) + '">' + LANG_LABEL[v] + "</button>").join("") + "</div>" +
+    '<div class="small muted">中英夾雜的選「中文」，英文術語會照樣保留。辨識不準的話，在每支影片的資料裡補上術語。</div></div>' +
     (s ? '<div class="pref-group"><div class="pref-h">電腦上的設定</div>' +
       '<div class="pref-row"><span class="small"><b>轉逐字稿模型</b></span><span class="small en">' + esc(s.asr_model) + "</span></div>" +
       '<div class="pref-row"><span class="small"><b>待處理資料夾</b></span><span class="small">' + esc(s.inbox) + "</span></div>" +

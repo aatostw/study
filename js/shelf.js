@@ -1,6 +1,6 @@
 "use strict";
 /* =========================================================
-   書櫃（一體化）：新增學習、匯入、收藏、我的書、記事本、課程
+   書櫃（一體化）：新增學習、匯入、收藏、我的書、記事本、影片
    記事本：不屬於任何書的獨立筆記，可以朗讀
    朗讀：任何 AI 內容旁的「朗讀」鍵＋底部小播放條
    ========================================================= */
@@ -101,13 +101,20 @@ function shelfGridHTML(){
   }
   if (!S.lectures) return loading();
   const list = starFirst(S.lectures.filter(shelfMatch));
-  if (!list.length) return '<div class="empty">' + (S.shelfQ ? "找不到符合的課程" : "還沒有課程。按右上角「新增」→ 課程。") + "</div>";
+  if (!list.length) return '<div class="empty">' + (S.shelfQ ? "找不到符合的影片" : "還沒有影片。按右上角「新增」→ 影片。") + "</div>";
   return '<div class="grid3">' + list.map(l => {
     const st = STATUS[l.status] || ["", ""];
-    return '<button class="gcard" data-act="' + (act || "open-lecture") + '" data-k="lecture:' + l.id + '" data-id="' + l.id + '"><div class="cover lec" style="background:' + hue(l.course || l.title) + '"><span class="lc">' + esc(l.course || "課程") + "</span><b>" + esc(l.title) + "</b>" +
-      '<i class="pdate">' + fmtDate(l.created_at) + (l.duration ? " · " + fmtDur(l.duration) : "") + "</i></div>" + (l.starred ? '<span class="gstar">★</span>' : "") +
+    return '<button class="gcard" data-act="' + (act || "open-lecture") + '" data-k="lecture:' + l.id + '" data-id="' + l.id + '">' + lecCover(l) + (l.starred ? '<span class="gstar">★</span>' : "") +
       (l.status !== "ready" ? '<span class="gbadge wish">' + st[0] + "</span>" : "") + selBox("lecture:" + l.id) + '<span class="gt">' + esc(l.title) + "</span></button>";
   }).join("") + "</div>";
+}
+function lecCover(l){
+  const img = lecThumb(l), k = l.youtube ? "" : "lthumb:" + l.id + ":" + l.thumb;
+  const vid = !!(l.youtube || l.has_video);
+  return '<div class="cover lec' + (vid ? " vthumb" : "") + '" style="background-color:' + hue(l.course || l.title) + '">' +
+    (vid ? '<div class="vimg"' + (k ? ' data-thumb="' + k + '"' : "") + (img ? ' style="background-image:url(' + img + ')"' : "") + '><span class="vplay">▶</span></div>' : "") +
+    '<span class="lc">' + esc(l.course || (l.youtube ? "YouTube" : "影片")) + "</span><b>" + esc(l.title) + "</b>" +
+    '<i class="pdate">' + (l.duration ? fmtDur(l.duration) : fmtDate(l.created_at)) + "</i></div>";
 }
 async function loadShelf(){
   await Promise.all([loadBooks(true), loadNotebook(true), loadLectures().catch(() => {})]);
@@ -115,13 +122,13 @@ async function loadShelf(){
 }
 function renderShelf(){
   let html = '<div class="shelf-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>' +
-    '<input id="shelf-q" placeholder="搜尋書名、作者、筆記、課程" value="' + esc(S.shelfQ) + '" autocomplete="off"></div>' +
+    '<input id="shelf-q" placeholder="搜尋書名、作者、筆記、影片" value="' + esc(S.shelfQ) + '" autocomplete="off"></div>' +
     '<div class="row between shelf-head"><h1>書櫃</h1><span class="row">' +
     (S.sel ? '<button class="hbtn" data-act="sel-toggle">完成</button>'
       : '<button class="hbtn" data-act="add-sheet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8" stroke-linecap="round"/></svg>新增</button>' +
         '<button class="hbtn" data-act="sel-toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.8 2.8L16.5 9.5" stroke-linecap="round" stroke-linejoin="round"/></svg>選擇</button>') +
     "</span></div>" +
-    '<div class="shelf-tabs">' + [["book", "我的書"], ["note", "記事本"], ["lecture", "課程"]].map(o => '<button data-act="shelf-tab" data-v="' + o[0] + '" aria-pressed="' + (S.shelfTab === o[0]) + '">' + o[1] + "</button>").join("") + "</div>" +
+    '<div class="shelf-tabs">' + [["book", "我的書"], ["note", "記事本"], ["lecture", "影片"]].map(o => '<button data-act="shelf-tab" data-v="' + o[0] + '" aria-pressed="' + (S.shelfTab === o[0]) + '">' + o[1] + "</button>").join("") + "</div>" +
     uploadsHTML("book") + uploadsHTML("lecture");
   const active = (S.jobs || []).filter(j => (j.status === "queued" || j.status === "running") && j.kind !== "cover");
   if (active.length) html += '<section class="card"><div class="label">電腦正在處理</div><div class="stack">' + active.map(j => '<div class="stack" style="gap:4px"><b class="small">' + esc(j.title) + "</b>" + jobCard(j) + "</div>").join("") + "</div></section>";
@@ -180,7 +187,7 @@ function addSheet(){
   openSheet('<h2>新增學習</h2><div class="stack">' +
     '<button class="list-row" data-act="book-new"><span class="ic">📘</span><span class="t"><b>書</b><span class="sub">開始讀一本書，記筆記、拍畫線段落</span></span><span class="chev">›</span></button>' +
     '<button class="list-row" data-act="free-new"><span class="ic yellow">📝</span><span class="t"><b>筆記</b><span class="sub">記事本：獨立的想法、摘錄，可以朗讀</span></span><span class="chev">›</span></button>' +
-    '<button class="list-row" data-act="pick-lecture"><span class="ic green">🎓</span><span class="t"><b>課程</b><span class="sub">上傳一堂課的錄音或影片</span></span><span class="chev">›</span></button>' +
+    '<button class="list-row" data-act="video-sheet"><span class="ic green">▶</span><span class="t"><b>影片</b><span class="sub">YouTube 網址，或上傳影片、錄音</span></span><span class="chev">›</span></button>' +
     '<button class="list-row" data-act="import-sheet"><span class="ic">⤓</span><span class="t"><b>匯入</b><span class="sub">PDF／EPUB 原文、錄音影片、電腦「待處理」資料夾</span></span><span class="chev">›</span></button>' +
     "</div>");
 }
@@ -227,14 +234,14 @@ function renderReview(){
   const r = S.review;
   if (!r) return html + (live ? "" : '<section class="card"><div class="empty">還沒有複習。按「產生本週至今」先看看這週的整理。</div></section>');
   const c = r.content || {};
-  if (r.status === "empty") return html + '<section class="card"><div class="empty">這一週（' + esc(c.label || "") + "）還沒有新的筆記、書或課程，沒有東西可以複習。</div></section>";
+  if (r.status === "empty") return html + '<section class="card"><div class="empty">這一週（' + esc(c.label || "") + "）還沒有新的筆記、書或影片，沒有東西可以複習。</div></section>";
   if (r.status === "error" && !c.headline) return html + '<div class="err">這篇複習沒有做好，再按一次「產生本週至今」。</div>';
   if (!c.headline) return html;
   const cnt = c.counts || {};
   html += '<section class="card" data-read="知識複習"><div class="row between no-read"><div class="label">本週主軸</div>' +
     '<button class="btn soft sm" data-act="rv-read">' + ICON.speaker + "朗讀整篇</button></div>" +
     '<p class="rv-head">' + esc(c.headline) + "</p>" +
-    '<div class="row wrap no-read">' + [["book", "書"], ["note", "記事本"], ["lecture", "課程"]].filter(k => cnt[k[0]]).map(k => '<span class="chip">' + k[1] + " " + cnt[k[0]] + " 則</span>").join("") +
+    '<div class="row wrap no-read">' + [["book", "書"], ["note", "記事本"], ["lecture", "影片"]].filter(k => cnt[k[0]]).map(k => '<span class="chip">' + k[1] + " " + cnt[k[0]] + " 則</span>").join("") +
     (cnt.chat ? '<span class="chip">問過助理</span>' : "") + "</div></section>";
   if ((c.highlights || []).length) html += '<section class="card"><div class="label">本週重點</div><div class="stack">' + c.highlights.map((h, i) =>
     '<div class="rv-item"><span class="rv-n">' + (i + 1) + '</span><div><b>' + esc(h.title) + '</b><div class="rv-text">' + rvCite(h.text) + "</div></div></div>").join("") + "</div></section>";

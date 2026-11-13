@@ -254,7 +254,7 @@ function pinItems(){
 function pinListHTML(){
   const u = S.pinUI, q = u.q.trim().toLowerCase(), all = pinItems();
   let html = "";
-  for (const [k, name] of [["book", "書"], ["note", "記事本"], ["lecture", "課程"]]){
+  for (const [k, name] of [["book", "書"], ["note", "記事本"], ["lecture", "影片"]]){
     let list = all[k].filter(x => !q || (x.label + " " + x.sub).toLowerCase().includes(q));
     if (!list.length) continue;
     const total = list.length, open = u.more[k] || q;
@@ -277,7 +277,7 @@ function advSheetBody(){
 
     '<div class="row between" style="margin-top:6px"><div class="label">指定資料</div><span class="tiny muted" id="pin-count">已選 ' + u.sel.size + " 項</span></div>" +
 
-    '<div class="row"><input class="input grow" id="pin-q" placeholder="搜尋書名、作者、課程…" value="' + esc(u.q) + '">' +
+    '<div class="row"><input class="input grow" id="pin-q" placeholder="搜尋書名、作者、影片…" value="' + esc(u.q) + '">' +
     '<button class="btn soft sm" data-act="pin-all">全選</button><button class="btn ghost sm" data-act="pin-clear">清除</button></div>' +
     '<div id="pin-list" class="stack">' + (!S.books || !S.notes || !S.lectures ? '<div class="row muted"><span class="spinner"></span>載入中…</div>' : pinListHTML()) + "</div>" +
     '<button class="btn block" data-act="pin-done">完成</button>';

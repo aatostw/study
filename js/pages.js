@@ -35,7 +35,7 @@ function loading(){ return loadErr() || '<div class="card flat"><div class="row"
 
 /* ---------- 問答 ---------- */
 function scopeSeg(cur, act){
-  const opts = [["all", "全部"], ["books", "書和筆記"], ["lectures", "課程"]];
+  const opts = [["all", "全部"], ["books", "書和筆記"], ["lectures", "影片"]];
   return '<div class="seg" role="group" aria-label="範圍">' + opts.map(o => '<button data-act="' + act + '" data-v="' + o[0] + '" aria-pressed="' + (cur === o[0]) + '">' + o[1] + "</button>").join("") + "</div>";
 }
 function answerHTML(r, ctx){
@@ -49,7 +49,7 @@ function answerHTML(r, ctx){
       '<div class="stack" style="margin-top:8px">' + rest.map(s => srcRow(s, ctx)).join("") + "</div></details>" : "") + "</div></section>";
 }
 function srcRow(s, ctx){
-  const kind = {note: "筆記", book: "原文", lecture: "課程", web: "網路"}[s.kind] || "";
+  const kind = {note: "筆記", book: "原文", lecture: "影片", web: "網路"}[s.kind] || "";
   return '<button class="src' + (s.cited ? " cited" : "") + '" data-act="src" data-ctx="' + ctx + '" data-n="' + s.n + '"><span class="n">' + s.n + '</span><span class="body"><span class="lbl">' +
     '<span class="chip ' + (s.kind === "lecture" ? "green" : s.kind === "note" ? "yellow" : s.kind === "web" ? "" : "blue") + '" style="padding:0 7px;font-size:12px;margin-right:6px">' + kind + "</span>" + esc(s.label) + (s.domain ? '<span class="tiny muted">　' + esc(s.domain) + "</span>" : "") +
     (s.level ? '<span class="rel rel-' + ({"高": "hi", "中": "mid"}[s.level] || "lo") + '">相關度 ' + s.level + "</span>" : "") +
@@ -67,7 +67,7 @@ function sourceSheet(s){
 /* ---------- 書櫃 ---------- */
 function jobCard(job){
   if (!job || job.status === "done") return "";
-  const name = {bookfile: "讀取原文", analyze: "AI 分析", lecture: "處理課程", resummarize: "重新摘要", evaluate: "選書評估", review: "知識複習"}[job.kind] || "處理中";
+  const name = {bookfile: "讀取原文", analyze: "AI 分析", lecture: "處理影片", resummarize: "重新摘要", evaluate: "選書評估", review: "知識複習"}[job.kind] || "處理中";
   if (job.status === "error") return '<div class="err">' + name + "失敗：" + esc(job.error) + '</div><button class="btn soft sm" data-act="job-retry" data-id="' + job.id + '">再試一次</button>';
   return '<div class="up"><div class="row between"><b class="small">' + name + '</b><span class="tiny muted">' + (job.status === "queued" ? "排隊中" : Math.round(job.progress * 100) + "%") + "</span></div>" +
     progressBar(job.progress) + '<div class="small muted">' + esc(job.step || "等前面的工作做完") + "</div></div>";
@@ -117,7 +117,7 @@ function analysisHTML(a){
   if (a.summary) html += '<p style="margin:0;line-height:1.75">' + esc(a.summary) + "</p>";
   if ((a.themes || []).length) html += '<div class="stack">' + a.themes.map(t => '<div class="sec"><h3>' + esc(t.title) + '</h3><div class="small" style="line-height:1.7">' + esc(t.explain || "") + "</div></div>").join("") + "</div>";
   if ((a.connections || []).length){
-    html += '<div class="label">跟其他書和課程的關聯</div><div class="stack">' + a.connections.map(c => '<div class="pt"><span class="chip green" style="flex:none">' + esc(c.theme || "") + '</span><span class="rich">' + richHTML(c.text, "analysis") + "</span></div>").join("") + "</div>";
+    html += '<div class="label">跟其他書和影片的關聯</div><div class="stack">' + a.connections.map(c => '<div class="pt"><span class="chip green" style="flex:none">' + esc(c.theme || "") + '</span><span class="rich">' + richHTML(c.text, "analysis") + "</span></div>").join("") + "</div>";
   }
   if ((a.questions || []).length) html += '<div class="label">值得再想的問題</div><ol style="margin:0;padding-left:22px;line-height:1.8">' + a.questions.map(q => "<li>" + esc(q) + "</li>").join("") + "</ol>";
   return html + '<div class="tiny muted">' + esc(a.at || "") + "</div></section>";

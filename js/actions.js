@@ -62,7 +62,7 @@ async function pollJobs(now){
     for (const j of S.jobs){
       if ((j.status === "done" || j.status === "error") && before.get(j.id) && before.get(j.id) !== j.status){
         changed = true;
-        if (j.status === "done" && j.kind !== "cover") toast({lecture: "課程處理好了：", resummarize: "重新摘要好了：", bookfile: "原文讀好了：", analyze: "分析好了：", evaluate: "完成：", review: "整理好了："}[j.kind] + j.title);
+        if (j.status === "done" && j.kind !== "cover") toast({lecture: "影片處理好了：", resummarize: "重新摘要好了：", bookfile: "原文讀好了：", analyze: "分析好了：", evaluate: "完成：", review: "整理好了："}[j.kind] + j.title);
       }
     }
     if (changed){
@@ -272,7 +272,7 @@ const ACT = {
   }),
   "sel-del": async () => {
     const n = S.sel.size;
-    if (!(await confirmBox("刪除 " + n + " 項？", "書會連同筆記、原文一起刪除；課程會連同錄音刪除。無法復原。", "刪除", true))) return;
+    if (!(await confirmBox("刪除 " + n + " 項？", "書會連同筆記、原文一起刪除；影片會連同錄音、影片檔刪除。無法復原。", "刪除", true))) return;
     act("seldel", async () => {
       const path = {book: "/books/", note: "/notes/", lecture: "/lectures/"};
       for (const k of S.sel){ const [kind, id] = k.split(":"); await api(path[kind] + id, {method: "DELETE"}); }
@@ -419,6 +419,18 @@ const ACT = {
   },
 
   /* 課程 */
+  "video-sheet": () => videoSheet(),
+  "yt-go": () => {
+    const url = $("#yt-url").value.trim();
+    if (!ytId(url)) return toast("請貼 YouTube 影片網址");
+    act("yt", async () => {
+      const r = await api("/lectures/youtube", {json: {url, lang: S.formLang}});
+      closeSheet(); toast("加入了，Gemini 開始看影片"); S.lastLang = S.formLang;
+      pollJobs(true); S.lectures = null; S.shelfTab = "lecture";
+      await loadLectures().catch(() => {});
+      go("books", {type: "lecture", id: r.lecture_id});
+    });
+  },
   "pick-lecture": () => { $("#pick-lecture").value = ""; $("#pick-lecture").click(); },
   "form-lang": el => { S.formLang = el.dataset.v; document.querySelectorAll("#l-lang button").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === S.formLang)); },
   "lecture-go": () => {
@@ -460,7 +472,7 @@ const ACT = {
   "lec-edit": () => lectureEditSheet(S.lecture.lecture),
   "lec-save": () => act("lecs", async () => { await api("/lectures/" + S.sub.id, {method: "PATCH", json: {course: $("#le-course").value, title: $("#le-title").value, terms: $("#le-terms").value}}); closeSheet(); S.lectures = null; await loadLecture(); }),
   "lec-del": async () => {
-    if (!(await confirmBox("刪除這堂課？", "錄音、逐字稿、摘要都會刪除，無法復原。", "刪除", true))) return;
+    if (!(await confirmBox("刪除這支影片？", "錄音、影片檔、逐字稿、摘要都會刪除，無法復原。", "刪除", true))) return;
     act("lecd", async () => { await api("/lectures/" + S.sub.id, {method: "DELETE"}); setAudio(null); S.lectures = null; go(S.view); });
   },
   "ask-lec": () => {
@@ -619,6 +631,8 @@ const AU = $("#au");
 ["timeupdate", "play", "pause", "loadedmetadata"].forEach(ev => AU.addEventListener(ev, () => playerTick()));
 function afterRender(){
   playerTick();
+  syncVideo();
+  loadThumbs();
   loadCovers();
   const ci = $("#chat-in");
   if (ci && ci.value){ ci.style.height = "auto"; ci.style.height = Math.min(ci.scrollHeight, 160) + "px"; }
