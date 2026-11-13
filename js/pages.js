@@ -83,8 +83,9 @@ function renderBook(){
   const sh = b.shelf || "reading";
   let html = back + '<section class="card hero"><div class="row between"><div class="seg shelf-seg" role="group" aria-label="狀態">' +
     ["wish", "reading", "done"].map(v => '<button data-act="shelf-set" data-v="' + v + '" aria-pressed="' + (sh === v) + '">' + SHELF[v] + "</button>").join("") + "</div>" +
-    starBtn("book", b.id, b.starred) + "</div><h1>" + esc(b.title) + "</h1>" +
-    (b.author ? '<div class="sub">' + esc(b.author) + "</div>" : "") +
+    starBtn("book", b.id, b.starred) + "</div>" +
+    '<div class="hero-book"><button class="hero-cover" data-act="cover-sheet" aria-label="換封面">' + coverHTML(b) + '<span class="hc-edit">換封面</span></button>' +
+    "<div><h1>" + esc(b.title) + "</h1>" + (b.author ? '<div class="sub">' + esc(b.author) + "</div>" : "") + "</div></div>" +
     '<div class="row wrap"><span class="chip">' + notes.length + " 則筆記</span>" +
     (b.file_name ? '<span class="chip">原文：' + esc(b.file_name) + "</span>" : "") + (b.isbn ? '<span class="chip en">ISBN ' + esc(b.isbn) + "</span>" : "") + "</div></section>";
   html += '<div class="row wrap"><button class="btn grow" data-act="note-new">' + ICON.plus + "記一則筆記</button>" +

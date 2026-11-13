@@ -59,6 +59,26 @@ def search(query, engines=None, lang="zh-TW", n=8):
     return out
 
 
+def search_images(query, n=8):
+    """圖片搜尋（SearXNG images 分類）：[{img, page, title}]"""
+    if config.FAKE:
+        return []
+    try:
+        r = httpx.get(SEARX + "/search", params={"q": query, "format": "json", "categories": "images", "safesearch": 0}, timeout=25)
+    except httpx.HTTPError:
+        raise RuntimeError("自架搜尋沒有開")
+    out = []
+    for x in (r.json().get("results", []) if r.status_code == 200 else []):
+        u = x.get("img_src") or ""
+        if u.startswith("//"):
+            u = "https:" + u
+        if u.startswith("http"):
+            out.append({"img": u, "page": x.get("url") or "", "title": x.get("title") or ""})
+        if len(out) >= n:
+            break
+    return out
+
+
 def _allowed(url):
     """遵守 robots.txt；讀不到 robots.txt 就當作可以"""
     p = urlparse(url)

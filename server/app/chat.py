@@ -216,6 +216,7 @@ def send(chat_id, text, scope="all", use_kb=True, use_web=False, pins=None, bala
         book = db.one("SELECT id FROM books WHERE title = %s ORDER BY id DESC LIMIT 1", (title,)) or \
             db.one("INSERT INTO books (title, shelf) VALUES (%s, 'wish') RETURNING id", (title,))
         jobs.add("evaluate", book["id"], "評估《%s》" % title)
+        jobs.add("cover", book["id"], "找封面《%s》" % title)
         reply = db.one("INSERT INTO chat_msgs (chat_id, role, content, scope, card) VALUES (%s, 'assistant', %s, %s, %s) RETURNING *",
                        (cid, "好，我上網找《%s》的讀者心得和作者背景，大約 1～3 分鐘。好了以後點下面的卡片看評估，書也會加進你的書櫃（想讀）。" % title,
                         scope, Jsonb({"type": "eval", "book_id": book["id"]})))

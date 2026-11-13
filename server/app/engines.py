@@ -75,6 +75,27 @@ def embed(texts):
         return [v.tolist() for v in vecs]
 
 
+# ---------- 封面比對（CLIP，跑在 CPU，不佔顯存）----------
+_clip = {"model": None}
+_clip_lock = threading.Lock()
+
+
+def image_similarity(ref, imgs):
+    """ref 跟每張圖的相似度（0～1）。模型載入失敗回傳 None"""
+    if config.FAKE or not imgs:
+        return [0.0] * len(imgs)
+    with _clip_lock:
+        if _clip["model"] is None:
+            try:
+                from sentence_transformers import SentenceTransformer
+                _clip["model"] = SentenceTransformer(config.CLIP_MODEL, device="cpu")
+            except Exception as e:
+                print("  [封面] 比對模型載入失敗：%s" % e, flush=True)
+                return None
+        vecs = _clip["model"].encode([ref] + list(imgs), normalize_embeddings=True, show_progress_bar=False)
+    return [float((vecs[0] * v).sum()) for v in vecs[1:]]
+
+
 # ---------- 重新排名（cross-encoder）----------
 _rr = {"model": None}
 _rr_lock = threading.Lock()

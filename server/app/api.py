@@ -12,7 +12,7 @@ import time
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response, StreamingResponse
 
-from . import ai, bookeval, chat, review, config, db, engines, jobs, knowledge, tts, websearch
+from . import ai, bookeval, chat, covers, review, config, db, engines, jobs, knowledge, tts, websearch
 from .textutil import fmt_t, tts_parts
 
 app = FastAPI(title="study-server", docs_url=None, redoc_url=None, openapi_url=None)
@@ -132,7 +132,7 @@ async def ai_test(request: Request):
 @app.get("/books")
 def books():
     rows = db.all("SELECT b.id, b.title, b.author, b.file_name, b.pages, b.status, b.updated_at, b.shelf, b.isbn, "
-                  "b.starred, b.analysis IS NOT NULL AS analyzed, b.evaluation->'credibility'->>'light' AS light, "
+                  "b.starred, b.cover, b.cover_src, b.analysis IS NOT NULL AS analyzed, b.evaluation->'credibility'->>'light' AS light, "
                   "b.evaluation->'verdict'->>'level' AS verdict, b.evaluation->'reception'->>'headline' AS headline, "
                   "(SELECT count(*) FROM notes n WHERE n.book_id = b.id) AS notes, "
                   "(SELECT status FROM jobs j WHERE j.ref_id = b.id AND j.kind = 'evaluate' ORDER BY j.id DESC LIMIT 1) AS eval_status "
@@ -153,9 +153,53 @@ async def book_add(request: Request):
     r = db.one("INSERT INTO books (title, author, isbn, shelf, wish_note) VALUES (%s, %s, %s, %s, %s) RETURNING *",
                (title, author, isbn, shelf, s(b.get("wish_note"), 1000)))
     out = {"ok": True, "book": r}
+    jobs.add("cover", r["id"], "找封面《%s》" % title)
     if b.get("evaluate"):
         out["job"] = jobs.add("evaluate", r["id"], "評估《%s》" % title)
     return out
+
+
+# ---------- 封面 ----------
+
+@app.get("/books/{bid}/cover")
+def cover_get(bid: int, photo: int = 0):
+    p = covers.path(bid, photo=bool(photo))
+    if not os.path.exists(p):
+        raise Bad("沒有封面", 404)
+    return Response(open(p, "rb").read(), media_type="image/jpeg", headers={"Cache-Control": "private, max-age=31536000"})
+
+
+@app.post("/books/{bid}/cover-photo")
+async def cover_photo(bid: int, request: Request, use: int = 0):
+    """上傳自己拍的封面。use=1：直接用這張；否則用它核對網路上找到的封面"""
+    data = await request.body()
+    if not data or len(data) > 15 * 1024 * 1024:
+        raise Bad("照片是空的或太大")
+    b = db.one("SELECT id, title FROM books WHERE id = %s", (bid,))
+    if not b:
+        raise Bad("找不到這本書", 404)
+    try:
+        im = covers._img(data)
+        im.thumbnail((1200, 1600))
+        im.save(covers.path(bid, photo=True), "JPEG", quality=88)
+    except Exception:
+        raise Bad("讀不了這張照片")
+    db.run("UPDATE books SET cover_mode = %s WHERE id = %s", ("photo" if use else "auto", bid))
+    return {"ok": True, "job": jobs.add("cover", bid, "找封面《%s》" % b["title"])}
+
+
+@app.post("/books/{bid}/cover")
+async def cover_set(bid: int, request: Request):
+    """mode：auto（重新自動找）／photo（用我拍的）／text（文字封面）"""
+    b = await body_json(request)
+    mode = b.get("mode") if b.get("mode") in ("auto", "photo", "text") else "auto"
+    bk = db.one("SELECT id, title FROM books WHERE id = %s", (bid,))
+    if not bk:
+        raise Bad("找不到這本書", 404)
+    if mode == "photo" and not os.path.exists(covers.path(bid, photo=True)):
+        raise Bad("還沒有拍過這本書的封面")
+    db.run("UPDATE books SET cover_mode = %s, cover_tried = false WHERE id = %s", (mode, bid))
+    return {"ok": True, "job": jobs.add("cover", bid, "找封面《%s》" % bk["title"])}
 
 
 @app.get("/lookup")
@@ -183,6 +227,7 @@ async def identify(request: Request):
     if isbn and not bookeval.isbn_ok(isbn):
         isbn = ""                                   # 看錯數字，寧可不要
     out = {"isbn": isbn, "title": str(d.get("title") or "").strip(), "author": str(d.get("author") or "").strip()}
+    out["cover_photo"] = bool(out["title"])      # 照片上看得到書名 → 是封面照，可以拿來核對／當封面
     if isbn and (not out["title"] or not out["author"]):
         info = bookeval.lookup_isbn(isbn) or {}
         out["title"] = out["title"] or info.get("title", "")

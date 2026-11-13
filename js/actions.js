@@ -46,7 +46,7 @@ async function pollJobs(now){
     for (const j of S.jobs){
       if ((j.status === "done" || j.status === "error") && before.get(j.id) && before.get(j.id) !== j.status){
         changed = true;
-        if (j.status === "done") toast({lecture: "課程處理好了：", resummarize: "重新摘要好了：", bookfile: "原文讀好了：", analyze: "分析好了：", evaluate: "完成：", review: "整理好了："}[j.kind] + j.title);
+        if (j.status === "done" && j.kind !== "cover") toast({lecture: "課程處理好了：", resummarize: "重新摘要好了：", bookfile: "原文讀好了：", analyze: "分析好了：", evaluate: "完成：", review: "整理好了："}[j.kind] + j.title);
       }
     }
     if (changed){
@@ -239,6 +239,46 @@ const ACT = {
   },
 
   /* 書櫃 */
+  "shelf-tab": el => { S.shelfTab = el.dataset.v; render(); },
+  "sel-toggle": () => { S.sel = S.sel ? null : new Set(); render(); },
+  "sel-pick": el => { const k = el.dataset.k; if (S.sel.has(k)) S.sel.delete(k); else S.sel.add(k); render(); },
+  "sel-star": () => act("selstar", async () => {
+    const items = [...S.sel].map(k => k.split(":"));
+    const all = {book: S.books || [], note: S.notes || [], lecture: S.lectures || []};
+    const on = !items.every(([k, id]) => (all[k].find(x => x.id === Number(id)) || {}).starred);
+    for (const [kind, id] of items) await api("/star", {json: {kind, id: Number(id), on}});
+    S.sel = null; await loadShelf(); toast(on ? "收藏了" : "取消收藏");
+  }),
+  "sel-shelf": () => openSheet('<h2>改成</h2><div class="stack">' + ["wish", "reading", "done"].map(v => '<button class="list-row" data-act="sel-shelf-set" data-v="' + v + '"><span class="t"><b>' + SHELF[v] + "</b></span></button>").join("") + "</div>"),
+  "sel-shelf-set": el => act("selshelf", async () => {
+    for (const k of S.sel) await api("/books/" + k.split(":")[1], {method: "PATCH", json: {shelf: el.dataset.v}});
+    closeSheet(); S.sel = null; await loadShelf(); toast("改好了");
+  }),
+  "sel-del": async () => {
+    const n = S.sel.size;
+    if (!(await confirmBox("刪除 " + n + " 項？", "書會連同筆記、原文一起刪除；課程會連同錄音刪除。無法復原。", "刪除", true))) return;
+    act("seldel", async () => {
+      const path = {book: "/books/", note: "/notes/", lecture: "/lectures/"};
+      for (const k of S.sel){ const [kind, id] = k.split(":"); await api(path[kind] + id, {method: "DELETE"}); }
+      S.sel = null; S.books = S.notes = S.lectures = null; await loadShelf(); toast("刪除了");
+    });
+  },
+  /* 封面 */
+  "cover-sheet": () => {
+    const b = S.book.book;
+    openSheet('<h2>換封面</h2><div class="stack">' +
+      '<button class="list-row" data-act="cover-shoot"><span class="ic">📷</span><span class="t"><b>拍封面</b><span class="sub">用照片核對網路上找到的封面，對不上就用照片</span></span></button>' +
+      '<button class="list-row" data-act="cover-lib"><span class="ic">🖼️</span><span class="t"><b>從相簿選</b><span class="sub">同上</span></span></button>' +
+      (b.cover_src === "photo" || b.cover_mode === "photo" ? "" : '<button class="list-row" data-act="cover-mode" data-v="photo"><span class="ic">📸</span><span class="t"><b>直接用我拍的照片</b></span></button>') +
+      '<button class="list-row" data-act="cover-mode" data-v="auto"><span class="ic">🔍</span><span class="t"><b>重新自動找</b></span></button>' +
+      '<button class="list-row" data-act="cover-mode" data-v="text"><span class="ic">Aa</span><span class="t"><b>用文字封面</b></span></button></div>');
+  },
+  "cover-shoot": () => { const i = $("#pick-cover"); i.dataset.for = "cover"; i.value = ""; i.click(); },
+  "cover-lib": () => { const i = $("#pick-cover-lib"); i.dataset.for = "cover"; i.value = ""; i.click(); },
+  "cover-mode": el => act("cover", async () => {
+    await api("/books/" + S.sub.id + "/cover", {json: {mode: el.dataset.v}});
+    closeSheet(); toast(el.dataset.v === "text" ? "改成文字封面" : "換封面中，幾秒鐘後會更新"); pollJobs(true);
+  }),
   "add-sheet": () => addSheet(),
   "import-sheet": () => importSheet(),
   "star": el => {
@@ -292,7 +332,7 @@ const ACT = {
 
   /* 書 */
   "open-book": el => { closeSheet(); S.book = null; S.evalOpen = false; go(["ask", "mybooks"].includes(S.view) ? S.view : "books", {type: "book", id: Number(el.dataset.id)}); },
-  "book-new": () => { S.wishKeep = null; wishSheet({}); },
+  "book-new": () => { S.wishKeep = null; S.coverPhoto = null; wishSheet({}); },
   "book-edit": () => { const b = S.book.book; openSheet('<h2>編輯書的資料</h2><div class="field"><label for="b-title">書名</label><input class="input" id="b-title" value="' + esc(b.title) + '"></div>' +
     '<div class="field"><label for="b-author">作者</label><input class="input" id="b-author" value="' + esc(b.author) + '"></div><button class="btn block" data-act="book-save">儲存</button>' +
     '<button class="btn ghost block" data-act="book-del" style="color:var(--danger)">刪除這本書（含所有筆記）</button>'); },
@@ -308,6 +348,7 @@ const ACT = {
     if (!body.title && !body.isbn) return toast("請填書名或 ISBN");
     act("wishc", async () => {
       const r = await api("/books", {json: body}); closeSheet(); S.books = null; S.evalOpen = false;
+      if (S.coverPhoto){ const ph = S.coverPhoto; S.coverPhoto = null; api("/books/" + r.book.id + "/cover-photo", {method: "POST", body: ph, headers: {"Content-Type": "image/jpeg"}}).catch(() => {}); }
       if (body.evaluate) pollJobs(true);
       go(S.view === "mybooks" ? "mybooks" : "books", {type: "book", id: r.book.id});
     });
@@ -471,6 +512,7 @@ document.addEventListener("click", e => {
 document.addEventListener("input", e => {
   const el = e.target, d = el.dataset && el.dataset.draft;
   if (d === "ask") S.ask.draft = el.value;
+  else if (el.id === "shelf-q"){ S.shelfQ = el.value; const g = $("#shelf-grid"); if (g){ g.innerHTML = shelfGridHTML(); loadCovers(); } }
   else if (el.id === "pin-q"){ S.pinUI.q = el.value; pinRedraw(); }
   else if (d === "chat"){
     S.chatDraft = el.value; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 160) + "px";
@@ -516,7 +558,17 @@ document.addEventListener("change", async e => {
     toast(el.checked ? "這則不會放進知識庫" : "這則會放進知識庫");
   });
   if (el.id === "w-eval"){ const nb = $("#w-note-box"); if (nb) nb.hidden = !el.checked; }
-  if ((el.id === "pick-cover" || el.id === "pick-cover-lib") && el.files[0]) coverDone(identifyCover(el.files[0]));
+  if ((el.id === "pick-cover" || el.id === "pick-cover-lib") && el.files[0]){
+    if (el.dataset.for === "cover"){        // 書頁「換封面」
+      el.dataset.for = "";
+      const f = el.files[0];
+      act("cover", async () => {
+        const blob = await shrinkImage(f, 1600);
+        await api("/books/" + S.sub.id + "/cover-photo", {method: "POST", body: blob, headers: {"Content-Type": "image/jpeg"}});
+        closeSheet(); toast("用照片核對封面中…"); pollJobs(true);
+      });
+    } else coverDone(identifyCover(el.files[0]));
+  }
   if (el.id === "pick-evid" && el.files[0]){
     const box = $("#evid-text"), prev = box ? box.value : "";
     S.busy.evid = true; evidenceSheet({user_evidence: prev});
@@ -550,6 +602,7 @@ const AU = $("#au");
 ["timeupdate", "play", "pause", "loadedmetadata"].forEach(ev => AU.addEventListener(ev, () => playerTick()));
 function afterRender(){
   playerTick();
+  loadCovers();
   const ci = $("#chat-in");
   if (ci && ci.value){ ci.style.height = "auto"; ci.style.height = Math.min(ci.scrollHeight, 160) + "px"; }
   if (S.chatScroll && S.view === "ask" && !S.sub){ S.chatScroll = false; const m = $("#main"); m.scrollTop = m.scrollHeight; }

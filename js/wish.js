@@ -128,7 +128,9 @@ async function identifyCover(file){
     }
   } catch (e) {}
   const blob = await shrinkImage(file, 1600);
-  return (await api("/identify", {method: "POST", body: blob, headers: {"Content-Type": "image/jpeg"}})).book;
+  const r = (await api("/identify", {method: "POST", body: blob, headers: {"Content-Type": "image/jpeg"}})).book;
+  if (r.cover_photo) r.photo = blob;          // 拍到的是封面：留著，加入書之後拿去核對網路上找到的封面
+  return r;
 }
 
 /* ---------- 相機：全螢幕取景，Android 對準條碼會自動認 ---------- */
@@ -203,6 +205,7 @@ async function coverDone(promise){
   try {
     const r = await promise;
     S.busy.identify = false;
+    if (r.photo) S.coverPhoto = r.photo;
     wishSheet({title: r.title || keep.title, author: r.author || keep.author, isbn: r.isbn || keep.isbn, wish_note: keep.wish_note, evaluate: keep.evaluate});
     toast(r.title ? "認出來了，確認一下" : r.isbn ? "讀到 ISBN，但查不到書名，請手動輸入書名" : "沒認出來，請拍清楚一點或手動輸入");
   } catch (err) { S.busy.identify = false; wishSheet(keep); toast(errMsg(err)); }

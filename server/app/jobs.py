@@ -11,7 +11,7 @@ import os
 import time
 import traceback
 
-from . import ai, bookeval, config, db, engines, knowledge, review
+from . import ai, bookeval, config, covers, db, engines, knowledge, review
 from .db import Jsonb
 from .textutil import chunk_text, epub_chapters, fmt_t, parse_t, pdf_pages, to_trad
 
@@ -50,7 +50,7 @@ def worker():
         print("  開始：%s %s" % (job["kind"], job["title"]), flush=True)
         try:
             {"lecture": run_lecture, "resummarize": run_resummarize,
-             "bookfile": run_bookfile, "analyze": run_analyze, "evaluate": bookeval.run_evaluate, "review": review.run}[job["kind"]](job, prog)
+             "bookfile": run_bookfile, "analyze": run_analyze, "evaluate": bookeval.run_evaluate, "review": review.run, "cover": covers.run_cover}[job["kind"]](job, prog)
             db.run("UPDATE jobs SET status = 'done', step = '完成', progress = 1, error = '', updated_at = now() WHERE id = %s", (job["id"],))
             print("  完成：%s %s" % (job["kind"], job["title"]), flush=True)
         except Exception as e:

@@ -12,10 +12,6 @@ async function loadNote(){
   if (!S.sub || S.sub.id !== id) return;
   S.note = j.note; S.err.load = ""; render();
 }
-async function loadShelf(){
-  await Promise.all([loadBooks(true), loadNotebook(true), loadLectures().catch(() => {})]);
-  render();
-}
 
 function starBtn(kind, id, on){
   return '<button class="star' + (on ? " on" : "") + '" data-act="star" data-kind="' + kind + '" data-id="' + id + '" data-on="' + (on ? 1 : 0) + '" aria-label="' + (on ? "取消收藏" : "收藏") + '">' + (on ? "★" : "☆") + "</button>";
@@ -53,18 +49,90 @@ function shelfSection(title, view, rows, total, empty){
     (total > rows.length ? '<button class="btn ghost sm" data-act="go" data-v="' + view + '">全部 ›</button>' : "") + "</div>" +
     (rows.length ? '<div class="stack">' + rows.join("") + "</div>" : '<div class="empty small">' + empty + "</div>") + "</section>";
 }
+/* ---------- 書櫃首頁：搜尋、我的書／記事本／課程 三欄卡片 ---------- */
+S.shelfTab = S.shelfTab || "book";
+S.shelfQ = "";
+S.sel = null;            // 多選模式：Set("book:3", ...)
+const PALETTE = ["#3A6EA5", "#4DB892", "#E07A5F", "#8E7DBE", "#F2B134", "#2E8B8B", "#C8553D", "#5B7083", "#9C6644", "#3D5A80"];
+function hue(s){ let h = 0; for (const c of s || "") h = (h * 31 + c.charCodeAt(0)) >>> 0; return PALETTE[h % PALETTE.length]; }
+
+const COVER_URL = new Map();
+async function loadCovers(){
+  for (const img of document.querySelectorAll("img[data-cover]:not([src])")){
+    const key = img.dataset.cover + ":" + img.dataset.v;
+    if (COVER_URL.has(key)){ img.src = COVER_URL.get(key); continue; }
+    img.setAttribute("src", "data:image/gif;base64,R0lGODlhAQABAAAAACw=");
+    try {
+      const res = await api("/books/" + img.dataset.cover + "/cover?v=" + img.dataset.v, {raw: true});
+      const u = URL.createObjectURL(await res.blob());
+      COVER_URL.set(key, u);
+      document.querySelectorAll('img[data-cover="' + img.dataset.cover + '"][data-v="' + img.dataset.v + '"]').forEach(x => x.src = u);
+    } catch (e) { img.closest(".cover") && img.closest(".cover").classList.add("noimg"); }
+  }
+}
+function coverHTML(b, big){
+  const txt = '<div class="tcover" style="background:' + hue(b.title) + '"><b>' + esc(b.title) + "</b>" + (b.author ? "<span>" + esc(b.author) + "</span>" : "") + "</div>";
+  return '<div class="cover' + (big ? " big" : "") + '">' + txt + (b.cover ? '<img data-cover="' + b.id + '" data-v="' + esc(b.cover) + '" alt="">' : "") + "</div>";
+}
+
+function shelfMatch(x){
+  const q = S.shelfQ.trim().toLowerCase();
+  return !q || [x.title, x.author, x.preview, x.course].some(v => (v || "").toLowerCase().includes(q));
+}
+function selBox(key){ return S.sel ? '<span class="selbox' + (S.sel.has(key) ? " on" : "") + '">' + (S.sel.has(key) ? "✓" : "") + "</span>" : ""; }
+function shelfGridHTML(){
+  const tab = S.shelfTab, act = S.sel ? "sel-pick" : null;
+  const starFirst = arr => arr.filter(x => x.starred).concat(arr.filter(x => !x.starred));
+  if (tab === "book"){
+    if (!S.books) return loading();
+    const list = starFirst(S.books.filter(shelfMatch));
+    if (!list.length) return '<div class="empty">' + (S.shelfQ ? "找不到符合的書" : "還沒有書。按右上角「新增」。") + "</div>";
+    return '<div class="grid3">' + list.map(b => '<button class="gcard" data-act="' + (act || "open-book") + '" data-k="book:' + b.id + '" data-id="' + b.id + '">' + coverHTML(b) +
+      (b.starred ? '<span class="gstar">★</span>' : "") + (b.shelf !== "reading" ? '<span class="gbadge ' + b.shelf + '">' + SHELF[b.shelf] + "</span>" : "") + selBox("book:" + b.id) +
+      '<span class="gt">' + esc(b.title) + "</span></button>").join("") + "</div>";
+  }
+  if (tab === "note"){
+    if (!S.notes) return loading();
+    const list = starFirst(S.notes.filter(n => shelfMatch({title: n.title, preview: n.preview})));
+    if (!list.length) return '<div class="empty">' + (S.shelfQ ? "找不到符合的筆記" : "記事本是空的。按右上角「新增」→ 筆記。") + "</div>";
+    return '<div class="grid3">' + list.map(n => '<button class="gcard" data-act="' + (act || "open-note") + '" data-k="note:' + n.id + '" data-id="' + n.id + '"><div class="cover paper"><b>' + esc(n.title || "（無標題）") + "</b><span>" + esc((n.preview || "").slice(0, 90)) + "</span>" +
+      '<i class="pdate">' + fmtDate(n.updated_at) + (n.no_index ? " 🔒" : "") + "</i></div>" + (n.starred ? '<span class="gstar">★</span>' : "") + selBox("note:" + n.id) +
+      '<span class="gt">' + esc(n.title || "（無標題）") + "</span></button>").join("") + "</div>";
+  }
+  if (!S.lectures) return loading();
+  const list = starFirst(S.lectures.filter(shelfMatch));
+  if (!list.length) return '<div class="empty">' + (S.shelfQ ? "找不到符合的課程" : "還沒有課程。按右上角「新增」→ 課程。") + "</div>";
+  return '<div class="grid3">' + list.map(l => {
+    const st = STATUS[l.status] || ["", ""];
+    return '<button class="gcard" data-act="' + (act || "open-lecture") + '" data-k="lecture:' + l.id + '" data-id="' + l.id + '"><div class="cover lec" style="background:' + hue(l.course || l.title) + '"><span class="lc">' + esc(l.course || "課程") + "</span><b>" + esc(l.title) + "</b>" +
+      '<i class="pdate">' + fmtDate(l.created_at) + (l.duration ? " · " + fmtDur(l.duration) : "") + "</i></div>" + (l.starred ? '<span class="gstar">★</span>' : "") +
+      (l.status !== "ready" ? '<span class="gbadge wish">' + st[0] + "</span>" : "") + selBox("lecture:" + l.id) + '<span class="gt">' + esc(l.title) + "</span></button>";
+  }).join("") + "</div>";
+}
+async function loadShelf(){
+  await Promise.all([loadBooks(true), loadNotebook(true), loadLectures().catch(() => {})]);
+  render();
+}
 function renderShelf(){
-  let html = '<div class="row"><button class="btn grow" data-act="add-sheet">' + ICON.plus + '新增學習</button><button class="btn soft" data-act="import-sheet">' + ICON.upload + "匯入</button></div>" +
+  let html = '<div class="shelf-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>' +
+    '<input id="shelf-q" placeholder="搜尋書名、作者、筆記、課程" value="' + esc(S.shelfQ) + '" autocomplete="off"></div>' +
+    '<div class="row between shelf-head"><h1>書櫃</h1><span class="row">' +
+    (S.sel ? '<button class="hbtn" data-act="sel-toggle">完成</button>'
+      : '<button class="hbtn" data-act="add-sheet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8" stroke-linecap="round"/></svg>新增</button>' +
+        '<button class="hbtn" data-act="sel-toggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.8 2.8L16.5 9.5" stroke-linecap="round" stroke-linejoin="round"/></svg>選擇</button>') +
+    "</span></div>" +
+    '<div class="shelf-tabs">' + [["book", "我的書"], ["note", "記事本"], ["lecture", "課程"]].map(o => '<button data-act="shelf-tab" data-v="' + o[0] + '" aria-pressed="' + (S.shelfTab === o[0]) + '">' + o[1] + "</button>").join("") + "</div>" +
     uploadsHTML("book") + uploadsHTML("lecture");
-  const active = (S.jobs || []).filter(j => j.status === "queued" || j.status === "running");
+  const active = (S.jobs || []).filter(j => (j.status === "queued" || j.status === "running") && j.kind !== "cover");
   if (active.length) html += '<section class="card"><div class="label">電腦正在處理</div><div class="stack">' + active.map(j => '<div class="stack" style="gap:4px"><b class="small">' + esc(j.title) + "</b>" + jobCard(j) + "</div>").join("") + "</div></section>";
-  if (!S.books || !S.notes || !S.lectures) return html + loading();
-  const books = S.books;
-  const stars = books.filter(b => b.starred).map(bookRow).concat(S.notes.filter(n => n.starred).map(noteRow), S.lectures.filter(l => l.starred).map(lectureRow));
-  if (stars.length) html += '<section class="card starred"><div class="label">★ 收藏</div><div class="stack">' + stars.join("") + "</div></section>";
-  html += shelfSection("我的書", "mybooks", books.slice(0, 4).map(bookRow), books.length, "還沒有書。按「新增學習」→ 書，拍封面或條碼就能認書。");
-  html += shelfSection("記事本", "notebook", S.notes.slice(0, 4).map(noteRow), S.notes.length, "隨手記、想法、要朗讀的文字都可以放這裡。");
-  html += shelfSection("課程", "lectures", S.lectures.slice(0, 4).map(lectureRow), S.lectures.length, "還沒有課程。按「新增學習」→ 課程，上傳錄音或影片。");
+  html += '<div id="shelf-grid">' + shelfGridHTML() + "</div>";
+  if (S.sel){
+    const n = S.sel.size, onlyBooks = n && [...S.sel].every(k => k.startsWith("book:"));
+    html += '<div class="selbar"><span>已選 ' + n + " 項</span>" +
+      '<button data-act="sel-star"' + (n ? "" : " disabled") + ">★ 收藏</button>" +
+      (onlyBooks ? '<button data-act="sel-shelf">改狀態</button>' : "") +
+      '<button data-act="sel-del" class="danger"' + (n ? "" : " disabled") + ">刪除</button></div>";
+  }
   return html;
 }
 
@@ -113,6 +181,7 @@ function addSheet(){
     '<button class="list-row" data-act="book-new"><span class="ic">📘</span><span class="t"><b>書</b><span class="sub">開始讀一本書，記筆記、拍畫線段落</span></span><span class="chev">›</span></button>' +
     '<button class="list-row" data-act="free-new"><span class="ic yellow">📝</span><span class="t"><b>筆記</b><span class="sub">記事本：獨立的想法、摘錄，可以朗讀</span></span><span class="chev">›</span></button>' +
     '<button class="list-row" data-act="pick-lecture"><span class="ic green">🎓</span><span class="t"><b>課程</b><span class="sub">上傳一堂課的錄音或影片</span></span><span class="chev">›</span></button>' +
+    '<button class="list-row" data-act="import-sheet"><span class="ic">⤓</span><span class="t"><b>匯入</b><span class="sub">PDF／EPUB 原文、錄音影片、電腦「待處理」資料夾</span></span><span class="chev">›</span></button>' +
     "</div>");
 }
 async function importSheet(){

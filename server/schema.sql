@@ -218,3 +218,10 @@ END $$;
 
 -- 助理：「指定」的書／筆記／課程，跟著這段對話
 ALTER TABLE chats ADD COLUMN IF NOT EXISTS pins jsonb NOT NULL DEFAULT '[]';
+
+-- 書的封面：存在 data/covers/{id}.jpg。cover = 版本號（換封面時變，App 才會重抓）；
+-- cover_src：google / openlibrary / search / photo；cover_mode：auto（自動找）／photo（用我拍的）／text（文字封面）
+ALTER TABLE books ADD COLUMN IF NOT EXISTS cover text NOT NULL DEFAULT '';
+ALTER TABLE books ADD COLUMN IF NOT EXISTS cover_src text NOT NULL DEFAULT '';
+ALTER TABLE books ADD COLUMN IF NOT EXISTS cover_mode text NOT NULL DEFAULT 'auto';
+ALTER TABLE books ADD COLUMN IF NOT EXISTS cover_tried boolean NOT NULL DEFAULT false;

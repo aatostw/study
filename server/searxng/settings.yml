@@ -37,3 +37,8 @@ engines:
     disabled: false
   - name: 360search
     disabled: false
+  # 書的封面圖
+  - name: bing images
+    disabled: false
+  - name: google images
+    disabled: false
