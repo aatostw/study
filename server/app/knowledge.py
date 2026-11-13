@@ -205,6 +205,8 @@ def answer(question, scope="all", k=10, history=None, search_text=None):
             "使用者：%s\n助理：%s" % (q, re.sub(r"\[\d{1,2}\]", "", a)[:600]) for q, a in history)
     prompt += "\n\n問題：" + question
     text, used = ai.generate("ask", prompt, system=ASK_SYSTEM, max_tokens=4096)
+    from .chat import norm_cites
+    text = norm_cites(text)
     cited = {int(n) for n in re.findall(r"\[(\d{1,2})\]", text)}
     for i, s in enumerate(sources, 1):
         s["n"] = i

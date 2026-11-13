@@ -87,6 +87,20 @@ MINE_RE = re.compile(r"我.{0,24}?(記了|記下|記過|寫了|寫過|畫了|畫
 BALANCE = {"kb": (0.05, 0.0), "even": (0.0, 0.0), "web": (0.0, 0.1)}   # (書櫃加分, 網路加分)
 
 
+CITE_RE = re.compile(r"[\[［【]\s*(\d{1,2}(?:\s*[,，、\-–~]\s*\d{1,2})*)\s*[\]］】]")
+
+
+def norm_cites(text):
+    """［1］、【1】、[1, 2]、[1-3] → [1][2][3]"""
+    def one(m):
+        ns = []
+        for p in re.split(r"\s*[,，、]\s*", m.group(1)):
+            r = [int(x) for x in re.split(r"\s*[\-–~]\s*", p)]
+            ns += list(range(r[0], r[1] + 1)) if len(r) == 2 and 0 <= r[1] - r[0] < 10 else [r[0]]
+        return "".join("[%d]" % n for n in ns)
+    return CITE_RE.sub(one, text or "")
+
+
 def _rank(query, cands, cited_keys, use_kb, balance="kb"):
     """本機重新排名，加權後只留最相關的幾段。排序模型不能用時，退回原本的向量分數。"""
     # 排名時連標題一起看（「《允許一切發生》第一章 我的筆記」），不然只看內容會認不出是哪本書
@@ -188,6 +202,7 @@ def respond(text, history, use_kb=True, use_web=False, prev_pool=None, cited_key
         prompt = hist + "問題：" + text
         system = SYSTEM_FREE
     answer, used = ai.generate("ask", prompt, system=system, max_tokens=4096)
+    answer = norm_cites(answer)
     cited = {int(n) for n in re.findall(r"\[(\d{1,2})\]", answer)}
     for s in sources:
         s["cited"] = s["n"] in cited

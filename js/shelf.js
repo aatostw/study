@@ -221,7 +221,7 @@ async function loadReview(id, quiet){
   if (!quiet) render();
 }
 function rvCite(text){
-  return esc(text || "").replace(/\[(\d{1,2})\]/g, (m, n) => '<button class="cite" data-act="rv-src" data-n="' + n + '">' + n + "</button>");
+  return citeNums(esc(text || ""), n => '<button class="cite" data-act="rv-src" data-n="' + n + '">' + n + "</button>");
 }
 function renderReview(){
   let html = '<section class="card hero"><div class="label">知識複習</div><h1>' + (S.review && S.review.content && S.review.content.label ? esc(S.review.content.label) : "這一週") + "</h1>" +

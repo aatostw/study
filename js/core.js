@@ -153,8 +153,20 @@ const ICON = {
 };
 
 /* 把 AI 回答裡的 [3] 變成可以點的小標籤 */
+/* [1]、［1］、【1】、[1, 2]、[1-3] 都算引用 */
+const CITE_RE = /\s?[\[［【]\s*(\d{1,2}(?:\s*[,，、\-–~]\s*\d{1,2})*)\s*[\]］】]/g;
+function citeNums(text, btn){
+  return text.replace(CITE_RE, (m, g) => {
+    const ns = [], parts = g.split(/\s*[,，、]\s*/);
+    for (const p of parts){
+      const r = p.split(/\s*[\-–~]\s*/).map(Number);
+      if (r.length === 2 && r[1] >= r[0] && r[1] - r[0] < 10) for (let i = r[0]; i <= r[1]; i++) ns.push(i); else ns.push(r[0]);
+    }
+    return ns.map(btn).join("");
+  });
+}
 function citeHTML(text, ctx){
-  return esc(text).replace(/\[(\d{1,2})\]/g, (m, n) => '<button class="cite" data-act="src" data-ctx="' + ctx + '" data-n="' + n + '">' + n + "</button>");
+  return citeNums(esc(text), n => '<button class="cite" data-act="src" data-ctx="' + ctx + '" data-n="' + n + '">' + n + "</button>");
 }
 /* AI 回答常用 Markdown（* 條列、1. 編號、**粗體**），轉成正常的條列；其他一律當純文字 */
 function richHTML(text, ctx){
