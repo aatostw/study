@@ -33,9 +33,9 @@ function chatModeLabel(){
 }
 
 function renderAssist(){
-  let html = '<div class="row between assist-bar"><span class="small muted ellip">' + esc(S.chat ? S.chat.title : "新對話") + "</span>" +
-    '<span class="row"><button class="btn ghost sm" data-act="chat-history">🕘 紀錄</button>' +
-    (S.chat ? '<button class="btn ghost sm" data-act="chat-new">' + ICON.plus + "新對話</button>" : "") + "</span></div>";
+  let html = '<div class="row between assist-bar"><button class="chat-title" data-act="chat-history" aria-label="對話紀錄"><span class="ellip">' + esc(S.chat ? S.chat.title : "新對話") +
+    '</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>' +
+    (S.chat ? '<button class="btn ghost sm" data-act="chat-new">' + ICON.plus + "新對話</button>" : "") + "</div>";
 
   const msgs = (S.chat && S.chat.messages) || [];
   if (!msgs.length && !S.chatPending){
