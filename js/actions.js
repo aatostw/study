@@ -398,7 +398,17 @@ const ACT = {
   "cam-close": () => CAM.close(),
   "cam-shot": () => CAM.shot(),
   "cam-lib": () => { CAM.close(); $("#pick-cover-lib").value = ""; $("#pick-cover-lib").click(); },
-  "evaluate": el => act("evaluate", async () => { await api("/books/" + el.dataset.id + "/evaluate", {method: "POST"}); toast("開始評估，大約 1～3 分鐘"); pollJobs(true); await loadBook(); }),
+  "job-cancel": async el => {
+    if (!(await confirmBox("停止選書評估？", "這次找到的資料不會保留，之前的評估結果不受影響。", "停止評估", true))) return;
+    try { await api("/jobs/" + el.dataset.id + "/cancel", {method: "POST"}); toast("已取消"); } catch (e) { toast(errMsg(e)); }
+    pollJobs(true); if (S.sub && (S.sub.type === "book" || S.sub.type === "eval")) loadBook().catch(() => {});
+  },
+  "evaluate": async el => {
+    const b = S.book && S.book.book;
+    if (b && b.evaluation && !(await confirmBox("重新評估這本書？", "會重新上網找資料、讓 AI 再判斷一次（約 1～3 分鐘），完成後取代目前的評估結果。", "重新評估"))) return;
+    ACT["evaluate-go"](el);
+  },
+  "evaluate-go": el => act("evaluate", async () => { await api("/books/" + el.dataset.id + "/evaluate", {method: "POST"}); toast("開始評估，大約 1～3 分鐘"); pollJobs(true); await loadBook(); }),
   "evid-open": () => evidenceSheet(S.book.book),
   "pick-evid": () => { $("#pick-evid").value = ""; $("#pick-evid").click(); },
   "evid-save": el => act("evid", async () => {

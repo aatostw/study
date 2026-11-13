@@ -768,10 +768,19 @@ def job_list(active: int = 0, limit: int = 20):
     return {"ok": True, "jobs": rows}
 
 
+@app.post("/jobs/{jid}/cancel")
+def job_cancel(jid: int):
+    j = db.one("UPDATE jobs SET status = 'cancelled', step = '已取消', updated_at = now() WHERE id = %s AND status = 'queued' RETURNING *", (jid,)) \
+        or db.one("UPDATE jobs SET cancel = true, step = '取消中…（等目前這一步做完）', updated_at = now() WHERE id = %s AND status = 'running' RETURNING *", (jid,))
+    if not j:
+        raise Bad("這個工作已經結束了")
+    return {"ok": True, "job": j}
+
+
 @app.post("/jobs/{jid}/retry")
 def job_retry(jid: int):
-    j = db.one("UPDATE jobs SET status = 'queued', error = '', step = '重新排隊', progress = 0, run_after = NULL, attempts = 0, updated_at = now() "
-               "WHERE id = %s AND status = 'error' RETURNING *", (jid,))
+    j = db.one("UPDATE jobs SET status = 'queued', error = '', step = '重新排隊', progress = 0, run_after = NULL, attempts = 0, cancel = false, updated_at = now() "
+               "WHERE id = %s AND status IN ('error', 'cancelled') RETURNING *", (jid,))
     if not j:
         raise Bad("這個工作不能重試")
     return {"ok": True, "job": j}

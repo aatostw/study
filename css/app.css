@@ -647,3 +647,7 @@ h1,h2{color:var(--primary-text)}
 #eval-body{gap:inherit}
 .page-top{flex-wrap:wrap;row-gap:8px}
 .page-top .pt-acts{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
+.job-bar{display:flex;align-items:center;gap:10px}
+.job-bar .progress{flex:1}
+.job-x{flex:none;width:28px;height:28px;border-radius:50%;border:0;background:#fde8e8;color:#d93025;display:grid;place-items:center;cursor:pointer;padding:0}
+.job-x svg{width:16px;height:16px}

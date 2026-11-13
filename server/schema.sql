@@ -234,3 +234,6 @@ ALTER TABLE lectures ADD COLUMN IF NOT EXISTS thumb int NOT NULL DEFAULT 0;
 -- AI 忙碌時自動延後重試
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS run_after timestamptz;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS attempts int NOT NULL DEFAULT 0;
+
+-- 取消進行中的工作
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS cancel boolean NOT NULL DEFAULT false;

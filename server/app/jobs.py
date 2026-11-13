@@ -30,8 +30,14 @@ class Progress:
         now = time.time()
         if force or now - self.last > 1.0:
             self.last = now
-            db.run("UPDATE jobs SET step = %s, progress = %s, updated_at = now() WHERE id = %s",
-                   (step, round(max(0.0, min(1.0, frac)), 3), self.id))
+            r = db.one("UPDATE jobs SET step = CASE WHEN cancel THEN step ELSE %s END, progress = %s, updated_at = now() WHERE id = %s RETURNING cancel",
+                       (step, round(max(0.0, min(1.0, frac)), 3), self.id))
+            if r and r["cancel"]:
+                raise Cancelled()
+
+
+class Cancelled(Exception):
+    """使用者按了取消"""
 
 
 BUSY_RE = re.compile(r"(?i)\b(503|529|429)\b|high demand|overloaded|UNAVAILABLE|RESOURCE_EXHAUSTED|忙碌|很忙")
@@ -58,6 +64,11 @@ def worker():
              "bookfile": run_bookfile, "analyze": run_analyze, "evaluate": bookeval.run_evaluate, "review": review.run, "cover": covers.run_cover}[job["kind"]](job, prog)
             db.run("UPDATE jobs SET status = 'done', step = '完成', progress = 1, error = '', updated_at = now() WHERE id = %s", (job["id"],))
             print("  完成：%s %s" % (job["kind"], job["title"]), flush=True)
+        except Cancelled:
+            db.run("UPDATE jobs SET status = 'cancelled', step = '已取消', error = '', updated_at = now() WHERE id = %s", (job["id"],))
+            if job["kind"] == "lecture":
+                _mark_ref_error(job)
+            print("  已取消：%s %s" % (job["kind"], job["title"]), flush=True)
         except Exception as e:
             msg = str(e) if isinstance(e, (ai.AIError, RuntimeError, ValueError)) else "%s: %s" % (type(e).__name__, e)
             n = job.get("attempts") or 0
