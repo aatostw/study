@@ -173,7 +173,8 @@ def _once(s, provider, model, task, prompt, system, images, json_mode, max_token
         if provider == "gemini":
             parts = [{"text": prompt}] + [{"inline_data": {"mime_type": mt, "data": base64.b64encode(b).decode()}} for mt, b in images]
             body = {"contents": [{"role": "user", "parts": parts}],
-                    "generationConfig": {"maxOutputTokens": max_tokens}}
+                    # 新的 Gemini 會先「思考」，思考也算在上限裡；多留空間，不然 JSON 會寫到一半被切掉（只算實際用到的）
+                    "generationConfig": {"maxOutputTokens": min(max_tokens + 16384, 65536)}}
             if system:
                 body["systemInstruction"] = {"parts": [{"text": system}]}
             if json_mode:
@@ -230,8 +231,9 @@ def generate_json(task, prompt, **kw):
     try:
         return parse_json(text), used
     except ValueError:
-        # 再給一次機會
-        text, used = generate(task, prompt + "\n\n上一次的回覆不是合法 JSON。這次只輸出 JSON。", json_mode=True, **kw)
+        # 再給一次機會：多半是寫太長被切掉，上限放大、請它精簡
+        kw["max_tokens"] = min(max(kw.get("max_tokens", 8192), 4000) * 3, 32000)
+        text, used = generate(task, prompt + "\n\n上一次的回覆不是完整的 JSON（可能太長被切斷）。這次只輸出 JSON，每個欄位寫精簡一點，一定要完整收尾。", json_mode=True, **kw)
         return parse_json(text), used
 
 
