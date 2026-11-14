@@ -716,3 +716,6 @@ h1,h2{color:var(--primary-text)}
   .app.has-video{grid-template-columns:220px minmax(0,1.4fr) minmax(380px,1fr)}
 }
 @media (min-width:768px){.app.has-video .vbox{width:auto;margin:20px 0 20px 20px;position:static}}
+.pop-cmp{align-items:center;padding-left:6px}
+.pop-cmp .pop-plus{flex:none;width:36px;height:36px}
+.pop-title .part-chip{border:0;cursor:pointer;font:inherit}

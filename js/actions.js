@@ -198,7 +198,9 @@ const ACT = {
   "rec-cancel": () => { if (S.rec.state === "rec") REC.stop(true); else if (S.rec.state === "stt"){ REC.cancel = true; } },
   "rec-stop": () => { if (S.rec.state === "rec") REC.stop(false, "draft"); },
   "rec-send": () => { if (S.rec.state === "rec") REC.stop(false, "send"); },
-  "menu-kb": () => { S.chatOpts.kb = !S.chatOpts.kb; lsSet("chat_kb", S.chatOpts.kb ? null : "0"); cmpMenu(); render(); },
+  "menu-kb": () => {
+    if (S.chatPins.length){ S.chatPins = []; S.chatOpts.kb = false; lsSet("chat_kb", "0"); toast("已取消指定引用"); cmpMenu(); render(); return; }
+    S.chatOpts.kb = !S.chatOpts.kb; lsSet("chat_kb", S.chatOpts.kb ? null : "0"); cmpMenu(); render(); },
   "menu-web": () => { S.chatOpts.web = !S.chatOpts.web; lsSet("chat_web", S.chatOpts.web ? null : "0"); cmpMenu(); render(); },
   "menu-cite": () => { ACT["cite-toggle"](); cmpMenu(); },
   "mic-cancel": () => REC.stop(true),
@@ -227,6 +229,9 @@ const ACT = {
   "askpop": () => askPopOpen(),
   "askpop-close": () => askPopClose(),
   "askpop-send": () => askPopSend(),
+  "pop-menu": () => popMenu(),
+  "pop-only": () => { S.pop.only = S.pop.only === false; popMenu(); askPopDraw(); },
+  "pop-web": () => { S.pop.web = !S.pop.web; popMenu(); askPopDraw(); },
   "askpop-unquote": () => { if (S.pop){ S.pop.quote = ""; askPopDraw(); } },
   "askpop-full": () => {
     const P = S.pop; if (!P || !P.chat) return;
