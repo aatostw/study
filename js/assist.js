@@ -360,9 +360,9 @@ function askPopDraw(scroll){
   const msgs = (P.chat && P.chat.messages) || [];
   card.innerHTML = '<div class="grab" aria-hidden="true"></div>' +
     '<div class="pop-head"><div class="pop-title"><button class="pop-switch" data-act="pop-chats"><b>' + esc(P.chat ? P.chat.title || "問助理" : "問助理") + '</b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>' +
-      '<button class="part-chip" data-act="pop-menu">' + popModeLabel(P) + "</button></div>" +
+"</div>" +
     (P.chat ? '<button class="btn ghost sm" data-act="askpop-full">到助理繼續</button>' : "") +
-    '<button class="icon-btn" data-act="askpop-close" aria-label="關閉"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
+"</div>" +
     '<div class="pop-thread" id="pop-thread">' +
       (msgs.length ? msgs.map(msgHTML).join("") : '<div class="pop-empty">問問看《' + esc(P.label) + "》裡的內容，回答只會引用" + POP_NAME[P.kind] + "。</div>") +
       (P.pending ? '<div class="msg user"><div class="bubble">' + esc(P.pending) + '</div></div><div class="msg ai"><div class="bubble"><span class="spinner"></span> 正在找資料、整理回答…</div></div>' : "") +
