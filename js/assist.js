@@ -271,9 +271,10 @@ function pinListHTML(){
 }
 function advSheetBody(){
   const o = S.chatOpts, u = S.pinUI;
-  return '<h2 style="margin:0">進階</h2>' +
-    '<div class="label">比重</div><div class="bal-seg" role="group" aria-label="比重">' + [["kb", "書櫃為主"], ["even", "平衡"], ["web", "網路為主"]].map(x =>
-      '<button data-act="chat-balance" data-v="' + x[0] + '" aria-pressed="' + (o.balance === x[0]) + '">' + x[1] + "</button>").join("") + "</div>" +
+  const pop = S.pinTarget === "pop";
+  return '<h2 style="margin:0">' + (pop ? "引用其他" : "進階") + "</h2>" +
+    (pop ? "" : '<div class="label">比重</div><div class="bal-seg" role="group" aria-label="比重">' + [["kb", "書櫃為主"], ["even", "平衡"], ["web", "網路為主"]].map(x =>
+      '<button data-act="chat-balance" data-v="' + x[0] + '" aria-pressed="' + (o.balance === x[0]) + '">' + x[1] + "</button>").join("") + "</div>") +
 
     '<div class="row between" style="margin-top:6px"><div class="label">指定資料</div><span class="tiny muted" id="pin-count">已選 ' + u.sel.size + " 項</span></div>" +
 
@@ -283,8 +284,10 @@ function advSheetBody(){
     '<button class="btn block" data-act="pin-done">完成</button>';
 }
 function pinRedraw(){ const l = $("#pin-list"); if (l) l.innerHTML = pinListHTML(); const c = $("#pin-count"); if (c) c.textContent = "已選 " + S.pinUI.sel.size + " 項"; }
-async function pinSheet(){
-  S.pinUI = {q: "", more: {}, det: {}, sel: new Set(S.chatPins.map(p => p.kind + ":" + p.id))};
+async function pinSheet(target){
+  S.pinTarget = target === "pop" ? "pop" : "chat";
+  const cur = S.pinTarget === "pop" ? (S.pop.extra || []) : S.chatPins;
+  S.pinUI = {q: "", more: {}, det: {}, sel: new Set(cur.map(p => p.kind + ":" + p.id))};
   openSheet(advSheetBody());
   if (!S.books || !S.notes || !S.lectures){
     await Promise.all([S.books ? 0 : loadBooks(true), S.notes ? 0 : loadNotebook(true), S.lectures ? 0 : loadLectures().catch(() => {})]).catch(() => {});
@@ -319,15 +322,36 @@ function askPopOpen(quote){
   askPopDraw(true);
   setTimeout(() => { const q = $("#pop-in"); if (q) q.focus(); }, 250);
 }
+function popPins(P){ return (P.only !== false ? [{kind: P.kind, id: P.id, label: P.label}] : []).concat(P.extra || []); }
 function popModeLabel(P){
-  const a = P.only !== false ? "只看" + POP_NAME[P.kind] : "整個書櫃";
+  const n = (P.extra || []).length, only = P.only !== false;
+  const a = only ? "只看" + POP_NAME[P.kind] + (n ? "＋" + n + " 項" : "") : n ? "指定 " + n + " 項" : "整個書櫃";
   return a + (P.web ? "＋網路" : "");
 }
 function popMenu(){
   const P = S.pop; if (!P) return;
+  const n = (P.extra || []).length;
   const tile = (k, on, title) => '<button class="menu-tile" data-act="' + k + '"><b>' + title + '</b><span class="sw' + (on ? " on" : "") + '"></span></button>';
   openSheet('<h2 style="margin:0">回答方式</h2><div class="tile-row">' + tile("pop-only", P.only !== false, "只看" + POP_NAME[P.kind]) + tile("pop-web", !!P.web, "網路搜尋") + "</div>" +
-    '<div class="tiny muted">' + (P.only !== false ? "只引用《" + esc(P.label) + "》。" : "關掉後會引用整個書櫃。") + (P.web ? "也會上網找資料。" : "") + "</div>");
+    '<button class="menu-sw" data-act="pop-pins"><span><b>引用其他</b>' + (n ? '<span class="small muted">　已選 ' + n + " 項</span>" : "") + '</span><span class="chev">›</span></button>');
+}
+/* 切換對話：新對話／之前的對話 */
+async function popChats(){
+  const draw = () => openSheet('<h2 style="margin:0">切換對話</h2>' +
+    '<button class="list-row" data-act="pop-chat-new"><span class="t"><b>＋ 新對話</b><span class="sub">回答方式：' + esc(popModeLabel(S.pop)) + "</span></span></button>" +
+    (!S.chats ? '<div class="row muted"><span class="spinner"></span>載入中…</div>' : '<div class="stack">' + S.chats.slice(0, 30).map(c =>
+      '<button class="list-row' + (S.pop.chat && S.pop.chat.id === c.id ? " cur" : "") + '" data-act="pop-chat-open" data-id="' + c.id + '"><span class="t"><b>' + esc(c.title || "（無標題）") + '</b><span class="sub">' + fmtDate(c.updated_at) + " · " + c.n + " 則</span></span>" +
+      (S.pop.chat && S.pop.chat.id === c.id ? '<span class="tiny muted">目前</span>' : '<span class="chev">›</span>') + "</button>").join("") + "</div>"));
+  draw();
+  if (!S.chats){ try { S.chats = (await api("/chats")).chats; } catch (e) { S.chats = []; } if (S.sheet) draw(); }
+}
+async function popChatOpen(id){
+  const P = S.pop, j = await api("/chats/" + id);
+  P.chat = {id: j.chat.id, title: j.chat.title, messages: j.messages};
+  const pins = j.chat.pins || [];
+  P.only = pins.some(p => p.kind === P.kind && Number(p.id) === Number(P.id));
+  P.extra = pins.filter(p => !(p.kind === P.kind && Number(p.id) === Number(P.id)));
+  P.err = ""; askPopDraw(true);
 }
 function askPopClose(){ $("#askpop").hidden = true; }
 function askPopDraw(scroll){
@@ -335,7 +359,8 @@ function askPopDraw(scroll){
   const keep = $("#pop-in") ? $("#pop-in").value : (P.draft || "");
   const msgs = (P.chat && P.chat.messages) || [];
   card.innerHTML = '<div class="grab" aria-hidden="true"></div>' +
-    '<div class="pop-head"><div class="pop-title"><b>問助理</b><button class="part-chip" data-act="pop-menu">' + popModeLabel(P) + "</button></div>" +
+    '<div class="pop-head"><div class="pop-title"><button class="pop-switch" data-act="pop-chats"><b>' + esc(P.chat ? P.chat.title || "問助理" : "問助理") + '</b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>' +
+      '<button class="part-chip" data-act="pop-menu">' + popModeLabel(P) + "</button></div>" +
     (P.chat ? '<button class="btn ghost sm" data-act="askpop-full">到助理繼續</button>' : "") +
     '<button class="icon-btn" data-act="askpop-close" aria-label="關閉"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
     '<div class="pop-thread" id="pop-thread">' +
@@ -356,8 +381,7 @@ async function askPopSend(){
   const text = P.quote ? "關於這段：「" + P.quote + "」\n" + (typed || "幫我解釋這段在說什麼，並連結我的筆記。") : typed;
   q.value = ""; P.quote = ""; P.pending = text; P.err = ""; askPopDraw(true);
   try {
-    const only = P.only !== false;
-    const r = await api("/chat", {json: {chat_id: P.chat && P.chat.id, message: text, kb: true, web: !!P.web, balance: P.web ? "even" : "kb", pins: only ? [{kind: P.kind, id: P.id, label: P.label}] : []}});
+    const r = await api("/chat", {json: {chat_id: P.chat && P.chat.id, message: text, kb: true, web: !!P.web, balance: P.web ? "even" : "kb", pins: popPins(P)}});
     if (!P.chat) P.chat = {id: r.chat.id, title: r.chat.title, messages: []};
     P.chat.messages.push(...r.messages);
     S.chats = null;

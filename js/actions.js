@@ -205,7 +205,7 @@ const ACT = {
   "menu-cite": () => { ACT["cite-toggle"](); cmpMenu(); },
   "mic-cancel": () => REC.stop(true),
   "chat-example": el => chatSend(el.dataset.q),
-  "pin-sheet": () => pinSheet(),
+  "pin-sheet": () => pinSheet("chat"),
   "chat-balance": el => {
     S.chatOpts.balance = el.dataset.v; lsSet("chat_balance", el.dataset.v === "kb" ? null : el.dataset.v);
     document.querySelectorAll("#sheet [data-act=chat-balance]").forEach(b => b.setAttribute("aria-pressed", b.dataset.v === el.dataset.v));
@@ -214,7 +214,12 @@ const ACT = {
   "cite-toggle": () => { S.showCite = !S.showCite; lsSet("show_cite", S.showCite ? null : "0"); document.documentElement.classList.toggle("hide-cite", !S.showCite); render(); },
   "pin-done": () => {
     const all = pinItems(), flat = [...all.book, ...all.note, ...all.lecture];
-    S.chatPins = flat.filter(x => S.pinUI.sel.has(x.kind + ":" + x.id)).map(x => ({kind: x.kind, id: x.id, label: x.label})).slice(0, 30);
+    const picked = flat.filter(x => S.pinUI.sel.has(x.kind + ":" + x.id)).map(x => ({kind: x.kind, id: x.id, label: x.label})).slice(0, 30);
+    if (S.pinTarget === "pop" && S.pop){
+      S.pop.extra = picked.filter(x => !(x.kind === S.pop.kind && x.id === S.pop.id));
+      S.pinTarget = "chat"; popMenu(); askPopDraw(); return;
+    }
+    S.chatPins = picked;
     closeSheet(); render();
   },
   "pin-all": () => {
@@ -230,6 +235,10 @@ const ACT = {
   "askpop-close": () => askPopClose(),
   "askpop-send": () => askPopSend(),
   "pop-menu": () => popMenu(),
+  "pop-pins": () => pinSheet("pop"),
+  "pop-chats": () => popChats(),
+  "pop-chat-new": () => { closeSheet(); S.pop.chat = null; S.pop.err = ""; askPopDraw(true); setTimeout(() => { const q = $("#pop-in"); if (q) q.focus(); }, 200); },
+  "pop-chat-open": el => { closeSheet(); popChatOpen(Number(el.dataset.id)).catch(e => toast(errMsg(e))); },
   "pop-only": () => { S.pop.only = S.pop.only === false; popMenu(); askPopDraw(); },
   "pop-web": () => { S.pop.web = !S.pop.web; popMenu(); askPopDraw(); },
   "askpop-unquote": () => { if (S.pop){ S.pop.quote = ""; askPopDraw(); } },

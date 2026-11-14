@@ -719,3 +719,7 @@ h1,h2{color:var(--primary-text)}
 .pop-cmp{align-items:center;padding-left:6px}
 .pop-cmp .pop-plus{flex:none;width:36px;height:36px}
 .pop-title .part-chip{border:0;cursor:pointer;font:inherit}
+.pop-switch{display:inline-flex;align-items:center;gap:4px;border:0;background:none;padding:0;font:inherit;cursor:pointer;min-width:0;max-width:52vw}
+.pop-switch b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pop-switch svg{width:18px;height:18px;flex:none;color:var(--muted)}
+.list-row.cur{box-shadow:inset 0 0 0 2px var(--primary)}
