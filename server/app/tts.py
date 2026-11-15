@@ -106,7 +106,7 @@ def synth(text, lang="zh", speed=1.0):
                     "text": text, "text_lang": lang, "ref_audio_path": ref, "prompt_text": ref_text,
                     "prompt_lang": ref_lang, "text_split_method": "cut5", "media_type": "wav", "speed_factor": speed})
             except httpx.HTTPError:
-                raise RuntimeError("GPT-SoVITS 沒有開：請先雙擊「啟動語音伺服器.bat」。")
+                raise RuntimeError("GPT-SoVITS 沒有開：請先雙擊 D:\\english-server 的「啟動語音伺服器.bat」。")
         if r.status_code != 200 or not r.headers.get("content-type", "").startswith("audio"):
             raise RuntimeError("GPT-SoVITS 唸不出來：%s" % r.text[:200])
         data = r.content
