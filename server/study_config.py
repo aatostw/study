@@ -9,6 +9,9 @@ AI 金鑰和每項工作要用的模型，不用寫在這裡，到 App 的「設
 # GPT-SoVITS 資料夾（朗讀會沿用裡面的聲音模型和參考音檔設定）
 GPT_SOVITS_DIR = r"D:\GPT-SoVITS-v2pro-20250604"
 
+# 每日英文的語音伺服器資料夾（voice_server.py、英文參考音檔 ref.wav）
+VOICE_SERVER_DIR = r"D:\english-server"
+
 # 所有資料放在這裡：上傳的影音、轉好的音訊、PDF/EPUB、朗讀暫存
 DATA_DIR = r"D:\study-server\data"
 

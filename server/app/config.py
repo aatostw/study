@@ -21,6 +21,7 @@ def _get(name, default):
 
 
 GPT_SOVITS_DIR = _get("GPT_SOVITS_DIR", "")
+VOICE_SERVER_DIR = _get("VOICE_SERVER_DIR", "")   # 每日英文的語音伺服器（voice_server.py）放的地方
 DATA_DIR = _get("DATA_DIR", os.path.join(HERE, "data"))
 INBOX_DIR = _get("INBOX_DIR", os.path.join(DATA_DIR, "inbox"))
 DATABASE_URL = _get("DATABASE_URL", "")

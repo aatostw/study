@@ -183,7 +183,7 @@ def main():
         db.init()
         say("  資料庫準備好了")
         say("ffmpeg：%s" % (engines.find_ffmpeg() or "找不到（課程處理需要；winget install Gyan.FFmpeg）"))
-        say("GPT-SoVITS 朗讀：%s" % {"ready": "已開啟", "offline": "沒開（需要朗讀時，先開「啟動語音伺服器.bat」）"}.get(tts.status(), "狀態不明"))
+        say("GPT-SoVITS 朗讀：%s" % {"ready": "已開啟", "offline": "沒開（需要朗讀時，先開 D:\\english-server 的「啟動語音伺服器.bat」）"}.get(tts.status(), "狀態不明"))
         threading.Thread(target=jobs.worker, daemon=True).start()
         threading.Thread(target=review.scheduler, daemon=True).start()
         threading.Thread(target=covers.backfill, daemon=True).start()

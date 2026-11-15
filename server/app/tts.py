@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-朗讀：直接用 GPT-SoVITS 的 api_v2（127.0.0.1:9880，由「啟動語音伺服器.bat」開啟），
+朗讀：直接用 GPT-SoVITS 的 api_v2（127.0.0.1:9880，由 D:\\english-server「啟動語音伺服器.bat」開啟），
 沿用 voice_server.py 裡的參考音檔設定，但可以選中文／英文／自動。
 """
 import hashlib
@@ -22,7 +22,9 @@ LANGS = {"zh": "中英混合", "en": "英文", "auto": "自動判斷"}
 
 def _voice_settings():
     """從 voice_server.py 讀參考音檔、參考文字、參考語言（只讀，不改）"""
-    path = os.path.join(config.GPT_SOVITS_DIR or "", "voice_server.py")
+    base = next((d for d in (config.VOICE_SERVER_DIR, r"D:\english-server", config.GPT_SOVITS_DIR)
+                 if d and os.path.isfile(os.path.join(d, "voice_server.py"))), config.GPT_SOVITS_DIR or "")
+    path = os.path.join(base, "voice_server.py")
     s = {"REF_AUDIO": "ref.wav", "REF_TEXT": "", "REF_LANG": "zh"}
     try:
         with open(path, encoding="utf-8") as f:
@@ -35,7 +37,8 @@ def _voice_settings():
         pass
     ref = s["REF_AUDIO"]
     if not os.path.isabs(ref):
-        ref = os.path.join(config.GPT_SOVITS_DIR or "", ref)
+        ref = next((p for p in (os.path.join(base, ref), os.path.join(config.GPT_SOVITS_DIR or "", ref)) if os.path.isfile(p)),
+                   os.path.join(base, ref))
     lang = s["REF_LANG"]
     # 參考文字全是英文的話，就該用英文規則讀它（voice_server.py 寫成 zh 會讓樣本被讀歪）
     if s["REF_TEXT"] and re.fullmatch(r"[\x00-\x7F]+", s["REF_TEXT"]):
