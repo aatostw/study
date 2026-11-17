@@ -4,7 +4,7 @@ import math
 import re
 import time
 
-from . import ai, db, engines
+from . import ai, db, engines, textutil
 from .db import Jsonb
 from .textutil import chunk_text, fmt_t
 
@@ -20,7 +20,7 @@ def note_text(n):
     if n.get("quote"):
         parts.append("摘句：" + n["quote"])
     if n.get("content"):
-        parts.append("想法：" + n["content"])
+        parts.append("想法：" + textutil.strip_images(n["content"]))
     return "\n".join(parts)
 
 

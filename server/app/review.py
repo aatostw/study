@@ -7,7 +7,7 @@ import re
 import threading
 import time
 
-from . import ai, config, db, jobs, tts
+from . import ai, config, db, jobs, textutil, tts
 from .db import Jsonb
 from .textutil import tts_parts
 
@@ -65,9 +65,9 @@ def _gather(start, end):
         if n["book_id"]:
             where = " ".join(x for x in [n["chapter"], ("p." + n["page"]) if n["page"] else ""] if x)
             add("book", n["book_id"], "《%s》筆記%s" % (n["book_title"], (" " + where) if where else ""),
-                ("摘句：" + n["quote"] + " ") * bool(n["quote"]) + ("想法：" + n["content"]) * bool(n["content"]))
+                ("摘句：" + n["quote"] + " ") * bool(n["quote"]) + ("想法：" + textutil.strip_images(n["content"])) * bool(n["content"]))
         else:
-            add("note", n["id"], "記事本：" + (n["title"] or "（無標題）"), n["content"][:1500])
+            add("note", n["id"], "記事本：" + (n["title"] or "（無標題）"), textutil.strip_images(n["content"])[:1500])
     for b in db.all("SELECT id, title, author, analysis FROM books WHERE analysis IS NOT NULL "
                     "AND updated_at >= %s AND updated_at < %s", (start, end)):
         a = b["analysis"] or {}

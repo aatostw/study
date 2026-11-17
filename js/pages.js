@@ -126,7 +126,7 @@ function noteHTML(n){
   return '<div class="note-card"><div class="row between"><div class="row wrap">' + (where ? '<span class="chip blue">' + esc(where) + "</span>" : "") +
     (n.source === "photo" ? '<span class="chip">拍照</span>' : "") + (n.indexed ? "" : '<span class="chip yellow">建索引中</span>') + "</div>" +
     '<span class="tiny muted">' + fmtDate(n.created_at) + "</span></div>" +
-    (n.quote ? '<div class="quote">' + esc(n.quote) + "</div>" : "") + (n.content ? '<div class="thought">' + esc(n.content) + "</div>" : "") +
+    (n.quote ? '<div class="quote">' + esc(n.quote) + "</div>" : "") + (n.content ? noteBody(n.content) : "") +
     '<div class="acts"><button class="btn ghost sm" data-act="note-edit" data-id="' + n.id + '">' + ICON.edit + '編輯</button><button class="btn ghost sm" data-act="note-del" data-id="' + n.id + '">' + ICON.trash + "刪除</button></div></div>";
 }
 function analysisHTML(a){
@@ -141,10 +141,11 @@ function analysisHTML(a){
 }
 function noteSheet(n){
   const isNew = !n.id;
+  S.ned = nedNew(n.content, "bn:" + (n.id || "new"), "為什麼畫這段、讓你想到什麼");
   openSheet('<h2>' + (isNew ? "記一則筆記" : "編輯筆記") + "</h2>" +
     (isNew ? '<button class="btn soft block" data-act="pick-photo">' + ICON.camera + "拍下畫線的那一頁（自動辨識文字）</button>" : "") +
     '<div class="field"><label for="n-quote">原文摘句</label><textarea class="input" id="n-quote" rows="4" placeholder="書裡的那段話">' + esc(n.quote || "") + "</textarea></div>" +
-    '<div class="field"><label for="n-content">我的想法</label><textarea class="input" id="n-content" rows="4" placeholder="為什麼畫這段、讓你想到什麼">' + esc(n.content || "") + "</textarea></div>" +
+    '<div class="field"><label for="ned-t0">我的想法</label>' + nedHTML() + "</div>" +
     '<div class="row"><div class="field grow"><label for="n-chapter">章節</label><input class="input" id="n-chapter" value="' + esc(n.chapter || "") + '" placeholder="第三章"></div>' +
     '<div class="field" style="width:110px"><label for="n-page">頁碼</label><input class="input en" id="n-page" inputmode="numeric" value="' + esc(n.page || "") + '"></div></div>' +
     '<button class="btn block" data-act="note-save" data-id="' + (n.id || "") + '" data-source="' + esc(n.source || "typed") + '">儲存</button>');

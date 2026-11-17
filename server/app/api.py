@@ -13,7 +13,7 @@ import time
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response, StreamingResponse
 
-from . import ai, bookeval, chat, covers, review, config, db, engines, jobs, knowledge, tts, video, websearch
+from . import ai, bookeval, chat, covers, review, config, db, engines, jobs, knowledge, textutil, tts, video, websearch
 from .textutil import fmt_t, tts_parts
 
 app = FastAPI(title="study-server", docs_url=None, redoc_url=None, openapi_url=None)
@@ -326,7 +326,7 @@ async def note_add(bid: int, request: Request):
 
 @app.get("/notes")
 def notebook():
-    rows = db.all("SELECT id, title, left(content, 160) AS preview, starred, no_index, created_at, updated_at, "
+    rows = db.all("SELECT id, title, left(regexp_replace(content, '\\[\\[圖片 [^]]*\\]\\]\\s*', '', 'g'), 160) AS preview, starred, no_index, created_at, updated_at, "
                   "EXISTS (SELECT 1 FROM chunks c WHERE c.note_id = n.id) AS indexed "
                   "FROM notes n WHERE book_id IS NULL ORDER BY updated_at DESC")
     return {"ok": True, "notes": rows}
@@ -340,6 +340,43 @@ async def notebook_add(request: Request):
         raise Bad("標題和內容至少填一個")
     r = db.one("INSERT INTO notes (book_id, title, content, source) VALUES (NULL, %s, %s, 'typed') RETURNING *", (title, content))
     return {"ok": True, "note": r}
+
+
+# ---------- 筆記裡的圖片 ----------
+# 存在 data\\note_images\\<16 碼>.jpg；筆記內容用一行 [[圖片 id=… size=寬x高 w=百分比 crop=x,y,w,h]] 記位置、大小和裁剪範圍（裁剪不動原圖，可以重裁）
+
+NIMG_RE = re.compile(r"^[0-9a-f]{16}\.jpg$")
+
+
+def _nimg_dir():
+    d = os.path.join(config.DATA_DIR, "note_images")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+@app.post("/note-images")
+async def note_image_add(request: Request):
+    data = await request.body()
+    if not data or len(data) > 25 * 1024 * 1024:
+        raise Bad("圖片是空的或太大（上限 25 MB）")
+    try:
+        im = covers._img(data)
+    except Exception as e:
+        raise Bad("讀不了這張圖片：%s" % str(e)[:120])
+    im.thumbnail((2400, 2400))
+    name = secrets.token_hex(8) + ".jpg"
+    im.save(os.path.join(_nimg_dir(), name), "JPEG", quality=88)
+    return {"ok": True, "id": name, "w": im.width, "h": im.height}
+
+
+@app.get("/note-images/{name}")
+def note_image_get(name: str):
+    if not NIMG_RE.match(name):
+        raise Bad("圖片名稱不對", 404)
+    p = os.path.join(_nimg_dir(), name)
+    if not os.path.exists(p):
+        raise Bad("找不到這張圖片", 404)
+    return Response(open(p, "rb").read(), media_type="image/jpeg", headers={"Cache-Control": "private, max-age=31536000, immutable"})
 
 
 @app.get("/notes/{nid}")
@@ -429,7 +466,7 @@ def book_export(bid: int):
         if n["quote"]:
             out += ["> " + n["quote"].replace("\n", "\n> ")]
         if n["content"]:
-            out += ["", n["content"]]
+            out += ["", textutil.strip_images(n["content"])]
         out += ["", "---", ""]
     return PlainTextResponse("\n".join(out), media_type="text/markdown; charset=utf-8")
 

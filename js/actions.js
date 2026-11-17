@@ -180,7 +180,7 @@ const ACT = {
   "pref-back": () => { S.prefPage = null; render.last = null; render(); $("#main").scrollTop = 0; },
   "back": async () => {
     if (S.noteEdit && S.noteDraft && !(await confirmBox("還沒儲存", "離開的話，這次的修改會不見。", "不儲存，離開", true))) return;
-    S.noteEdit = null; S.noteDraft = null; closeSheet(); if (S.sub && S.sub.type === "eval") return go(S.view, {type: "book", id: S.sub.id}); go(S.view); },
+    S.noteEdit = null; S.noteDraft = null; S.ned = null; closeSheet(); if (S.sub && S.sub.type === "eval") return go(S.view, {type: "book", id: S.sub.id}); go(S.view); },
   "go": el => { closeSheet(); go(el.dataset.v); },
   "assist": el => { S.assist = el.dataset.v || null; render.last = null; render(); $("#main").scrollTop = 0; if (!S.books) loadBooks(); },
   "ask-focus": () => { const q = $("#chat-in"); if (q) q.focus(); },
@@ -338,14 +338,18 @@ const ACT = {
   },
   "open-note": el => { closeSheet(); S.note = null; go(S.view === "notebook" ? "notebook" : "books", {type: "note", id: Number(el.dataset.id)}); },
   "free-new": () => freeNoteSheet({}),
-  "free-edit": () => { S.noteEdit = S.note.id; S.noteDraft = null; render(); setTimeout(() => { const t = $("#f-content"); if (t){ growTA(t); t.focus(); } }, 50); },
-  "free-cancel": () => { S.noteEdit = null; S.noteDraft = null; render(); },
+  "free-edit": () => {
+    S.noteEdit = S.note.id; S.noteDraft = null; S.ned = nedNew(S.note.content, "note:" + S.note.id, "想法、摘錄、要朗讀的文章…"); render();
+    setTimeout(() => { const t = $("#ned-t0"); if (t) t.focus(); }, 50);
+  },
+  "free-cancel": () => { S.noteEdit = null; S.noteDraft = null; S.ned = null; render(); },
   "free-save": el => {
-    const body = {title: $("#f-title").value.trim(), content: $("#f-content").value};
+    if (nedBusy()) return toast("圖片還在上傳，等一下再存");
+    const body = {title: $("#f-title").value.trim(), content: nedText()};
     if (!body.title && !body.content.trim()) return toast("標題和內容至少填一個");
     act("free", async () => {
-      if (el.dataset.id){ await api("/notes/" + el.dataset.id, {method: "PATCH", json: body}); closeSheet(); S.notes = null; S.noteEdit = null; S.noteDraft = null; await loadNote(); }
-      else { const r = await api("/notes", {json: body}); closeSheet(); S.notes = null; go(S.view === "notebook" ? "notebook" : "books", {type: "note", id: r.note.id}); }
+      if (el.dataset.id){ await api("/notes/" + el.dataset.id, {method: "PATCH", json: body}); closeSheet(); S.notes = null; S.noteEdit = null; S.noteDraft = null; S.ned = null; await loadNote(); }
+      else { const r = await api("/notes", {json: body}); closeSheet(); S.notes = null; S.ned = null; go(S.view === "notebook" ? "notebook" : "books", {type: "note", id: r.note.id}); }
       toast("存好了");
     });
   },
@@ -452,7 +456,8 @@ const ACT = {
   "note-new": () => noteSheet(S.ntab && S.ntab !== "ai" && S.ntab !== "未分章" && S.sub && S.sub.type === "book" ? {chapter: S.ntab} : {}),
   "note-edit": el => noteSheet(S.book.notes.find(n => String(n.id) === el.dataset.id) || {}),
   "note-save": el => {
-    const body = {quote: $("#n-quote").value, content: $("#n-content").value, chapter: $("#n-chapter").value, page: $("#n-page").value, source: el.dataset.source};
+    if (nedBusy()) return toast("圖片還在上傳，等一下再存");
+    const body = {quote: $("#n-quote").value, content: nedText(), chapter: $("#n-chapter").value, page: $("#n-page").value, source: el.dataset.source};
     if (!body.quote.trim() && !body.content.trim()) return toast("摘句和想法至少填一個");
     act("note", async () => {
       if (el.dataset.id) await api("/notes/" + el.dataset.id, {method: "PATCH", json: body});
@@ -598,6 +603,7 @@ const ACT = {
   "api-save": () => { S.api = $("#api-url").value.trim().replace(/\/+$/, "") || DEFAULT_API; lsSet("api", S.api); toast("網址存好了"); load(); },
   "logout": async () => { if (await confirmBox("登出？", "這支手機要重新輸入密碼才能用。", "登出")) logout(); }
 };
+Object.assign(ACT, NED_ACT);
 
 /* ---------- 事件 ---------- */
 document.addEventListener("click", e => {
@@ -700,10 +706,7 @@ function growTA(t){
   m.scrollTop = top;
 }
 document.addEventListener("input", e => {
-  if ((e.target.id === "f-content" || e.target.id === "f-title") && S.noteEdit && $(".note-edit")){
-    S.noteDraft = {title: $("#f-title").value, content: $("#f-content").value};
-    if (e.target.id === "f-content") growTA(e.target);
-  }
+  if (e.target.id === "f-title" && S.noteEdit && $(".note-edit")) nedChanged();
   if (e.target.id === "pop-in"){ const q = e.target; q.style.height = "auto"; q.style.height = Math.min(q.scrollHeight, 120) + "px"; }
 });
 document.addEventListener("keydown", e => {
@@ -719,7 +722,7 @@ const AU = $("#au");
 ["timeupdate", "play", "pause", "loadedmetadata"].forEach(ev => AU.addEventListener(ev, () => playerTick()));
 function afterRender(){
   playerTick();
-  const ta = $(".inline-ta"); if (ta) growTA(ta);
+  document.querySelectorAll(".ned-t").forEach(nedGrow);
   syncAskBtn();
   syncVideo();
   loadThumbs();

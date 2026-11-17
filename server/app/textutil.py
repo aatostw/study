@@ -22,6 +22,16 @@ def to_trad(text):
     return _cc.convert(text) if _cc else text
 
 
+IMG_TOKEN = re.compile(r"\n?\[\[圖片 [^\]]*\]\]\n?")
+
+
+def strip_images(text):
+    """筆記裡的圖片標記 [[圖片 id=… size=… w=…]] 不是文字，給 AI、索引、匯出之前拿掉。"""
+    if not text or "[[圖片" not in text:
+        return text or ""
+    return IMG_TOKEN.sub("\n", text).strip()
+
+
 def fmt_t(sec):
     sec = max(0, int(round(float(sec or 0))))
     h, rem = divmod(sec, 3600)

@@ -174,26 +174,28 @@ function renderNote(){
   const n = S.note;
   if (S.noteEdit === n.id){
     const d = S.noteDraft || {title: n.title || "", content: n.content || ""};
+    if (!S.ned || S.ned.key !== "note:" + n.id) S.ned = nedNew(d.content, "note:" + n.id, "想法、摘錄、要朗讀的文章…");
     return pageTop("記事本", '<button class="btn soft sm" data-act="free-cancel">取消</button>' +
         '<button class="btn sm" data-act="free-save" data-id="' + n.id + '">' + (S.busy.free ? '<span class="spinner"></span>' : "") + "儲存</button>") +
       '<section class="card note-edit"><input class="ne-title" id="f-title" value="' + esc(d.title) + '" placeholder="標題">' +
       '<div class="tiny muted">' + fmtDate(n.updated_at) + " · 編輯中</div>" +
-      '<textarea class="ne-body inline-ta" id="f-content" placeholder="想法、摘錄、要朗讀的文章…">' + esc(d.content) + "</textarea></section>";
+      nedHTML() + "</section>";
   }
-  if (S.noteEdit) S.noteEdit = null;
+  if (S.noteEdit){ S.noteEdit = null; S.ned = null; }
   return pageTop("記事本", '<button class="btn soft sm" data-act="read-note">' + ICON.speaker + "朗讀</button>" +
       '<button class="btn soft sm" data-act="free-edit">' + ICON.edit + "編輯</button>" +
       '<button class="btn soft sm" data-act="free-del" style="color:var(--danger)">' + ICON.trash + "刪除</button>") +
     '<section class="card" id="note-card" data-read="' + esc(n.title || "筆記") + '"><div class="row between top"><h2 class="grow" style="margin:0">' + esc(n.title || "（無標題）") + "</h2>" + starBtn("note", n.id, n.starred) + "</div>" +
     '<div class="tiny muted no-read">' + fmtDate(n.updated_at) + (n.no_index ? " · 不放進知識庫" : n.indexed ? "" : " · 建索引中") + "</div>" +
-    '<div class="thought">' + esc(n.content) + "</div>" +
+    noteBody(n.content) +
     '<label class="check no-read"><input type="checkbox" id="note-noindex"' + (n.no_index ? " checked" : "") + '><span><b>不放進知識庫</b><span class="small muted">助理和知識複習都不會用到這則，例如測驗題、草稿。</span></span></label></section>';
 }
 function freeNoteSheet(n){
   n = n || {};
+  S.ned = nedNew(n.content, "free:" + (n.id || "new"), "想法、摘錄、要朗讀的文章…");
   openSheet("<h2>" + (n.id ? "編輯筆記" : "寫一則筆記") + "</h2>" +
     '<div class="field"><label for="f-title">標題</label><input class="input" id="f-title" value="' + esc(n.title || "") + '" placeholder="例如：讀書會的想法"></div>' +
-    '<div class="field"><label for="f-content">內容</label><textarea class="input" id="f-content" rows="12" placeholder="想法、摘錄、要朗讀的文章…">' + esc(n.content || "") + "</textarea></div>" +
+    '<div class="field"><label for="ned-t0">內容</label>' + nedHTML() + "</div>" +
     '<button class="btn block" data-act="free-save" data-id="' + (n.id || "") + '">儲存</button>');
 }
 
